@@ -93,7 +93,7 @@ public class EmailUtil {
         );
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
-        restTemplate.postForEntity("https://api.mailersend.com/v1/email", entity, String.class);
+        restTemplate.postForEntity(appProperties.getMailersend().getApiUrl(), entity, String.class);
     }
 }
 

@@ -1,8 +1,6 @@
 package com.project.souklab.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToMany;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,6 +10,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
+@Table(name = "roles")
 @Getter
 @Setter
 @NoArgsConstructor

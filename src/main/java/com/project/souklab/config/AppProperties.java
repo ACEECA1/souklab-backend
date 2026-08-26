@@ -23,15 +23,15 @@ public class AppProperties {
     @Data
     public static class Jwt {
         private String secret;
-        private long accessTokenExpirationMs = 3600000;
-        private long refreshTokenExpirationMs = 86400000;
+        private Long accessTokenExpirationMs;
+        private Long refreshTokenExpirationMs;
     }
 
     @Data
     public static class Storage {
-        private String uploadDir = "storage/uploads";
-        private String thumbnails = "storage/thumbnails";
-        private String indexes = "storage/indexes";
+        private String uploadDir;
+        private String thumbnails;
+        private String indexes;
     }
 
     @Data
@@ -46,21 +46,22 @@ public class AppProperties {
 
     @Data
     public static class Email {
-        private boolean useSmtp = true;
+        private boolean useSmtp;
     }
 
     @Data
     public static class Mailersend {
         private String apiKey;
-        private String senderEmail = "noreply@souklab.dz";
-        private String senderName = "Souklab";
+        private String apiUrl;
+        private String senderEmail;
+        private String senderName;
     }
 
     @Data
     public static class Chargily {
         private String apiKey;
         private String secretKey;
-        private String mode = "test";
+        private String mode;
         private String webhookSecret;
     }
 }
