@@ -110,7 +110,7 @@ public class UserManagementService {
         userRepository.save(user);
 
         auditLogService.logAction(AuditLogAction.APPROVE_USER, "Approved user ID: " + userId);
-        notificationService.createForUser(user, "Your account has been approved and activated.", NotificationType.USER_APPROVED, user.getId());
+        notificationService.createForUser(user, "Your account has been approved and activated.", NotificationType.ACCOUNT_VALIDATED, user.getId());
     }
 
     /**
@@ -235,10 +235,6 @@ public class UserManagementService {
                 .dateOfBirth(user.getDateOfBirth())
                 .status(user.getStatus())
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .permissions(user.getRoles().stream()
-                        .flatMap(r -> r.getPermissions().stream())
-                        .map(p -> p.getName().name())
-                        .collect(Collectors.toSet()))
                 .bannedUntil(user.getBannedUntil())
                 .banReason(user.getBanReason())
                 .createdAt(user.getCreatedAt())

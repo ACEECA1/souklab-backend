@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/roles")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_ROLE')")
+@PreAuthorize("hasRole('ADMIN')")
 public class RoleManagementController {
 
     private final RoleManagementService roleManagementService;
@@ -31,10 +31,10 @@ public class RoleManagementController {
     }
 
     @PutMapping("/{roleId}")
-    public ResponseEntity<ApiResponse<RoleResponseDTO>> updateRolePermissions(
+    public ResponseEntity<ApiResponse<RoleResponseDTO>> updateRole(
             @PathVariable Long roleId,
             @Valid @RequestBody RoleUpdateRequestDTO request) {
-        return ResponseEntity.ok(ApiResponse.success(roleManagementService.updateRolePermissions(roleId, request), "Role permissions updated"));
+        return ResponseEntity.ok(ApiResponse.success(roleManagementService.updateRole(roleId, request), "Role updated"));
     }
 
     @GetMapping
@@ -42,11 +42,6 @@ public class RoleManagementController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponse.success(roleManagementService.getRoles(PageRequest.of(page, size))));
-    }
-
-    @GetMapping("/permissions")
-    public ResponseEntity<ApiResponse<List<String>>> getPermissions() {
-        return ResponseEntity.ok(ApiResponse.success(roleManagementService.getPermissions()));
     }
 
     @PostMapping("/assign")

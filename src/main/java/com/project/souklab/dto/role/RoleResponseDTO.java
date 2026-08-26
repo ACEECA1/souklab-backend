@@ -10,5 +10,5 @@ import java.util.Set;
 public class RoleResponseDTO {
     private Long id;
     private String name;
-    private Set<String> permissions;
+    private String description;
 }

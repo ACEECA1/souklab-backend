@@ -2,7 +2,6 @@ package com.project.souklab.service.auth;
 
 import lombok.RequiredArgsConstructor;
 import com.project.souklab.dao.UserRepository;
-import com.project.souklab.model.Permission;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
 import org.springframework.security.core.GrantedAuthority;
@@ -26,7 +25,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     /**
      * Loads a user from the database by their username to perform authentication and authorization.
-     * This method maps the user's roles and permissions to Spring Security {@link GrantedAuthority}s,
+     * This method maps the user's roles to Spring Security {@link GrantedAuthority}s,
      * and sets account status flags like 'disabled' (for pending users) or 'accountLocked' (for banned users).
      *
      * @param username the username of the user attempting to authenticate
@@ -43,9 +42,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         
         for (Role role : user.getRoles()) {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
-            for (Permission permission : role.getPermissions()) {
-                authorities.add(new SimpleGrantedAuthority(permission.getName().name()));
-            }
         }
 
         boolean isAccountLocked = user.getStatus() == User.UserStatus.BANNED 

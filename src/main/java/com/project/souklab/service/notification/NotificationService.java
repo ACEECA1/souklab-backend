@@ -116,7 +116,7 @@ public class NotificationService {
     public void notifyAdmins(String message) {
         userRepository.findAll().stream()
                 .filter(user -> user.getRoles().stream().anyMatch(role -> "ADMIN".equals(role.getName())))
-                .forEach(admin -> createForUser(admin, message, NotificationType.SYSTEM_MESSAGE, null));
+                .forEach(admin -> createForUser(admin, message));
     }
 
     /**

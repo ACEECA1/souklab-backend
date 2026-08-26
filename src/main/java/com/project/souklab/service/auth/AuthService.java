@@ -246,7 +246,7 @@ public class AuthService {
     }
 
     /**
-     * Converts a User entity into a UserResponseDTO, flattening roles and permissions into collections.
+     * Converts a User entity into a UserResponseDTO, flattening roles into collections.
      *
      * @param user the User entity to map
      * @return the mapped UserResponseDTO
@@ -260,10 +260,6 @@ public class AuthService {
                 .dateOfBirth(user.getDateOfBirth())
                 .status(user.getStatus())
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .permissions(user.getRoles().stream()
-                        .flatMap(r -> r.getPermissions().stream())
-                        .map(p -> p.getName().name())
-                        .collect(Collectors.toSet()))
                 .createdAt(user.getCreatedAt())
                 .build();
     }

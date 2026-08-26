@@ -7,6 +7,6 @@ import java.util.Set;
 @Data
 public class RoleUpdateRequestDTO {
 
-    private Set<String> permissions;
+    private String description;
 
 }

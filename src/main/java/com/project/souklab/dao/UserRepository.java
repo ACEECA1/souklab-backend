@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     
-    @EntityGraph(attributePaths = {"roles", "roles.permissions"})
+    @EntityGraph(attributePaths = {"roles"})
     Optional<User> findByUsername(String username);
     
     boolean existsByUsername(String username);
