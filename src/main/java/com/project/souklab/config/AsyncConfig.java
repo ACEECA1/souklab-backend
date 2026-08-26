@@ -16,7 +16,7 @@ public class AsyncConfig {
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(16);
         executor.setQueueCapacity(200);
-        executor.setThreadNamePrefix("pfe-async-");
+        executor.setThreadNamePrefix("souklab-async-");
         executor.initialize();
         return executor;
     }
@@ -27,7 +27,7 @@ public class AsyncConfig {
         executor.setCorePoolSize(8);
         executor.setMaxPoolSize(32);
         executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("pfe-workflow-");
+        executor.setThreadNamePrefix("souklab-workflow-");
         executor.initialize();
         return executor;
     }

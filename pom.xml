@@ -105,12 +105,6 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
-        <!-- Async Messaging: Spring AMQP / RabbitMQ (Flagged for user decision on async queue architecture) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
-        </dependency>
-
         <!-- Email: Spring Boot Starter Mail (Verification & Password Reset) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
