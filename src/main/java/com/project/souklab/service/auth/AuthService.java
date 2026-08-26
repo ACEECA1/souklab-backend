@@ -1,243 +1,439 @@
 package com.project.souklab.service.auth;
 
-import lombok.RequiredArgsConstructor;
-import com.project.souklab.dao.UserRepository;
+import com.project.souklab.config.AppProperties;
+import com.project.souklab.dao.*;
 import com.project.souklab.dto.auth.*;
-import com.project.souklab.model.RefreshToken;
-import com.project.souklab.model.Role;
-import com.project.souklab.model.User;
+import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ConflictException;
+import com.project.souklab.exception.ForbiddenException;
+import com.project.souklab.exception.ResourceNotFoundException;
+import com.project.souklab.exception.UnauthorizedException;
+import com.project.souklab.model.*;
 import com.project.souklab.security.JwtUtils;
 import com.project.souklab.service.notification.NotificationService;
 import com.project.souklab.service.security.RefreshTokenService;
-import com.project.souklab.exception.AppException;
 import com.project.souklab.util.SecurityUtils;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final OAuthIdentityRepository oauthIdentityRepository;
+    private final ArtisanProfileRepository artisanProfileRepository;
+    private final ClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
     private final NotificationService notificationService;
     private final JwtUtils jwtUtils;
     private final RefreshTokenService refreshTokenService;
+    private final AppProperties appProperties;
 
     /**
-     * Registers a new user account in the system.
-     * The user's status is initially set to PENDING, requiring an admin to approve the registration.
-     * It also triggers a notification to all admins that a new user is awaiting approval.
-     *
-     * @param dto the data transfer object containing the user's registration details (username, password, etc.)
-     * @return the newly created and saved User entity
-     * @throws AppException if the provided username is already taken
+     * Registers a new user.
+     * ARTISAN users start with status PENDING (requiring administrative review).
+     * CLIENT users start with status ACTIVE (can immediately log in and participate).
+     * Public registration strictly prohibits ADMIN accounts.
      */
     @Transactional
-    public User registerUser(UserRegistrationDTO dto) {
-        if (userRepository.existsByUsername(dto.getUsername())) {
-            throw new AppException("Username is already taken", HttpStatus.BAD_REQUEST);
+    public UserResponseDTO registerUser(UserRegistrationDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            throw new ConflictException("Email is already registered: " + email);
         }
 
-        User user = new User();
-        user.setUsername(dto.getUsername());
-        user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        user.setFirstName(dto.getFirstName());
-        user.setLastName(dto.getLastName());
-        user.setDateOfBirth(dto.getDateOfBirth());
-        user.setStatus(User.UserStatus.PENDING);
+        String roleInput = dto.getRole() != null ? dto.getRole().trim().toUpperCase() : "";
+        if (roleInput.equals("ADMIN") || roleInput.equals("ROLE_ADMIN")) {
+            throw new BadRequestException("Administrator registration is not permitted via public registration.");
+        }
+
+        String roleName = roleInput.startsWith("ROLE_") ? roleInput : "ROLE_" + roleInput;
+        if (!roleName.equals("ROLE_ARTISAN") && !roleName.equals("ROLE_CLIENT")) {
+            throw new BadRequestException("Invalid registration role. Allowed roles are ARTISAN or CLIENT.");
+        }
+
+        Role assignedRole = roleRepository.findByName(roleName)
+                .or(() -> roleRepository.findByName(roleInput.replace("ROLE_", "")))
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName(roleName);
+                    newRole.setDescription(roleName + " role");
+                    return roleRepository.save(newRole);
+                });
+
+        String firstName = dto.getFirstName();
+        String lastName = dto.getLastName();
+        if ((firstName == null || firstName.isBlank()) && dto.getName() != null && !dto.getName().isBlank()) {
+            String[] parts = dto.getName().trim().split("\\s+", 2);
+            firstName = parts[0];
+            lastName = parts.length > 1 ? parts[1] : "";
+        }
+
+        boolean isArtisan = roleName.equals("ROLE_ARTISAN");
+        AccountStatus initialStatus = isArtisan ? AccountStatus.PENDING : AccountStatus.ACTIVE;
+
+        User user = User.builder()
+                .email(email)
+                .password(passwordEncoder.encode(dto.getPassword()))
+                .firstName(firstName)
+                .lastName(lastName)
+                .status(initialStatus)
+                .emailVerified(false)
+                .roles(new HashSet<>(Set.of(assignedRole)))
+                .build();
 
         User savedUser = userRepository.save(user);
-        notificationService.notifyAdmins("New user registration pending approval: " + savedUser.getUsername());
-        return savedUser;
+
+        if (isArtisan) {
+            try {
+                notificationService.notifyAdmins("New artisan registration pending approval: " + savedUser.getEmail());
+            } catch (Exception e) {
+                log.warn("Could not dispatch admin notification for registration: {}", e.getMessage());
+            }
+        }
+
+        return mapToDTO(savedUser);
     }
 
     /**
-     * Authenticates a user based on their credentials and generates access/refresh tokens.
-     * If authentication is successful, the user's context is set in the SecurityContextHolder.
-     *
-     * @param dto the data transfer object containing the user's login credentials (username and password)
-     * @return a JwtResponseDTO containing the JWT access token, refresh token, and user role information
-     * @throws AppException if the user is not found or authentication fails
+     * Authenticates a user by email and password, issuing access + refresh token pair.
      */
     @Transactional
-    public JwtResponseDTO login(LoginDTO dto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getUsername(), dto.getPassword())
-        );
+    public JwtResponseDTO login(LoginDTO dto, HttpServletRequest request) {
+        String identifier = dto.getLoginIdentifier();
+        if (identifier == null || identifier.isBlank()) {
+            throw new BadRequestException("Email is required for login.");
+        }
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String email = identifier.toLowerCase();
+        User user = userRepository.findByEmail(email)
+                .or(() -> userRepository.findByUsername(email))
+                .orElseThrow(() -> new UnauthorizedException("Invalid email or password."));
 
-        String jwt = jwtUtils.generateAccessToken(authentication);
-        
-        User user = userRepository.findByUsername(dto.getUsername())
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new UnauthorizedException("This account was created via social login. Please sign in with Google.");
+        }
 
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
+        if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new UnauthorizedException("Invalid email or password.");
+        }
+
+        if (user.getStatus() == AccountStatus.SUSPENDED 
+                || (user.getBannedUntil() != null && user.getBannedUntil().isAfter(LocalDateTime.now()))) {
+            throw new ForbiddenException("Account is suspended: " + (user.getBanReason() != null ? user.getBanReason() : "Please contact support."));
+        }
+
+        if (user.getStatus() == AccountStatus.REJECTED) {
+            throw new ForbiddenException("Account registration was rejected: " + (user.getBanReason() != null ? user.getBanReason() : "Please contact support."));
+        }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        if (request != null) {
+            user.setLastLoginIp(extractClientIp(request));
+        }
+        userRepository.save(user);
+
+        return generateJwtResponse(user);
+    }
+
+    /**
+     * Rotates refresh tokens (revokes old, issues new pair).
+     */
+    @Transactional
+    public JwtResponseDTO refreshToken(TokenRefreshRequestDTO request) {
+        RefreshToken oldToken = refreshTokenRepository.findByToken(request.getRefreshToken())
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token."));
+
+        RefreshToken newToken = refreshTokenService.rotateRefreshToken(oldToken);
+        User user = newToken.getUser();
+
+        String accessToken = jwtUtils.generateAccessToken(user.getEmail());
 
         return JwtResponseDTO.builder()
-                .accessToken(jwt)
-                .refreshToken(refreshToken.getToken())
-                .username(user.getUsername())
+                .accessToken(accessToken)
+                .refreshToken(newToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
+                .user(mapToSummaryDTO(user))
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
                 .build();
     }
 
     /**
-     * Refreshes a user's JWT access token using a valid refresh token.
-     * The refresh token must exist in the database and not be expired.
-     *
-     * @param request the data transfer object containing the user's current refresh token
-     * @return a new JwtResponseDTO containing the newly generated access token and the same refresh token
-     * @throws AppException if the refresh token is missing, invalid, or expired
+     * Revokes all refresh tokens for the given user.
      */
     @Transactional
-    public JwtResponseDTO refreshToken(TokenRefreshRequestDTO request) {
-        return refreshTokenService.findByToken(request.getRefreshToken())
-                .map(refreshTokenService::verifyExpiration)
-                .map(RefreshToken::getUser)
-                .map(user -> {
-                    String token = jwtUtils.generateAccessToken(user.getUsername());
-                    return JwtResponseDTO.builder()
-                            .accessToken(token)
-                            .refreshToken(request.getRefreshToken())
-                            .username(user.getUsername())
-                            .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
-                            .build();
-                })
-                .orElseThrow(() -> new AppException("Refresh token is not in database!", HttpStatus.FORBIDDEN));
-    }
-
-    /**
-     * Logs out a user by invalidating their current session and deleting all their active refresh tokens.
-     *
-     * @param username the username of the user to log out
-     */
-    @Transactional
-    public void logout(String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
-        if (user != null) {
-            refreshTokenService.deleteByUserId(user.getId());
+    public void logout(String userEmail, String refreshTokenStr) {
+        if (refreshTokenStr != null && !refreshTokenStr.isBlank()) {
+            refreshTokenRepository.deleteByToken(refreshTokenStr.trim());
+        }
+        if (userEmail != null && !userEmail.isBlank()) {
+            userRepository.findByEmail(userEmail.toLowerCase())
+                    .ifPresent(refreshTokenService::deleteByUser);
         }
     }
 
     /**
-     * Changes the authenticated user's password securely.
-     * The user must provide their correct old password to authorize the change.
-     *
-     * @param request the data transfer object containing the old password and the new desired password
-     * @throws AppException if the user is not authenticated, not found, or the old password does not match
-     */
-    @Transactional
-    public void changePassword(ChangePasswordRequestDTO request) {
-        String username = SecurityUtils.getCurrentUsername();
-        if (username == null) {
-            throw new AppException("Not authenticated", HttpStatus.UNAUTHORIZED);
-        }
-
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
-
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new AppException("Invalid old password", HttpStatus.BAD_REQUEST);
-        }
-
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
-    }
-
-    /**
-     * Initiates a password reset process for a user.
-     * Token-based email reset will be implemented in Phase 2.
-     *
-     * @param request the data transfer object containing the username/email of the account
-     */
-    @Transactional
-    public void forgotPassword(ForgotPasswordRequestDTO request) {
-        // Phase 2 implementation will generate a secure reset token and email it to the user
-    }
-
-    /**
-     * Completes the password reset process by applying the new password.
-     * Token-based email reset will be implemented in Phase 2.
-     *
-     * @param request the data transfer object containing the reset token and the new password
-     */
-    @Transactional
-    public void resetPassword(ResetPasswordRequestDTO request) {
-        // Phase 2 implementation will validate token and update password
-    }
-
-    /**
-     * Retrieves the profile and details of the currently authenticated user.
-     *
-     * @return a UserResponseDTO containing the user's basic profile, roles, and permissions
-     * @throws AppException if there is no authenticated user or the user cannot be found
+     * Returns the currently authenticated user's profile.
      */
     @Transactional(readOnly = true)
     public UserResponseDTO getCurrentUser() {
-        String username = SecurityUtils.getCurrentUsername();
-        if (username == null) {
-            throw new AppException("Not authenticated", HttpStatus.UNAUTHORIZED);
+        String email = SecurityUtils.getCurrentUsername();
+        if (email == null) {
+            throw new UnauthorizedException("Not authenticated.");
         }
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
         return mapToDTO(user);
     }
 
     /**
-     * Updates the profile information of the currently authenticated user.
-     * Only fields that are explicitly provided (non-null) in the request will be modified.
-     *
-     * @param request the data transfer object containing the profile fields to update
-     * @return a {@link UserResponseDTO} containing the user's updated profile information
-     * @throws AppException if the user is not authenticated or cannot be found in the database
+     * Completes profile creation for Artisan or Client.
      */
     @Transactional
-    public UserResponseDTO updateProfile(UpdateProfileRequestDTO request) {
-        String username = SecurityUtils.getCurrentUsername();
-        if (username == null) {
-            throw new AppException("Not authenticated", HttpStatus.UNAUTHORIZED);
+    public UserResponseDTO completeProfile(CompleteProfileRequestDTO dto) {
+        String email = SecurityUtils.getCurrentUsername();
+        if (email == null) {
+            throw new UnauthorizedException("Not authenticated.");
         }
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
-        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
-        if (request.getLastName() != null) user.setLastName(request.getLastName());
-        if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
+        boolean isArtisan = user.getRoles().stream()
+                .anyMatch(r -> r.getName().equalsIgnoreCase("ROLE_ARTISAN") || r.getName().equalsIgnoreCase("ARTISAN"));
+        boolean isClient = user.getRoles().stream()
+                .anyMatch(r -> r.getName().equalsIgnoreCase("ROLE_CLIENT") || r.getName().equalsIgnoreCase("CLIENT"));
 
-        userRepository.save(user);
+        if (isArtisan) {
+            ArtisanProfile profile = artisanProfileRepository.findById(user.getId())
+                    .orElse(ArtisanProfile.builder().user(user).build());
+
+            if (dto.getBio() != null) profile.setBio(dto.getBio());
+            if (dto.resolveRegionId() != null) profile.setRegionId(dto.resolveRegionId());
+            if (dto.getCity() != null) profile.setCity(dto.getCity());
+            if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
+            if (dto.getWebsite() != null) profile.setWebsite(dto.getWebsite());
+            if (dto.getSubCategoryId() != null) profile.setSubCategoryId(dto.getSubCategoryId());
+            if (dto.getIsTeacher() != null) profile.setTeacher(dto.getIsTeacher());
+
+            artisanProfileRepository.save(profile);
+            user.setArtisanProfile(profile);
+        } else if (isClient) {
+            Client client = clientRepository.findById(user.getId())
+                    .orElse(Client.builder().user(user).build());
+
+            if (dto.getClientType() != null) client.setClientType(dto.getClientType());
+            if (dto.getCompanyName() != null) client.setCompanyName(dto.getCompanyName());
+            if (dto.resolveRegionId() != null) client.setRegionId(dto.resolveRegionId());
+            if (dto.getCity() != null) client.setCity(dto.getCity());
+
+            clientRepository.save(client);
+            user.setClient(client);
+        }
+
         return mapToDTO(user);
     }
 
     /**
-     * Converts a User entity into a UserResponseDTO, flattening roles into collections.
-     *
-     * @param user the User entity to map
-     * @return the mapped UserResponseDTO
+     * Processes Google OAuth2 authentication callback:
+     * 1. Matches existing OAuthIdentity (provider=GOOGLE, provider_user_id)
+     * 2. Otherwise matches existing User by verified email and auto-links
+     * 3. Otherwise creates new User + OAuthIdentity with requested role from intent
      */
-    public UserResponseDTO mapToDTO(User user) {
-        return UserResponseDTO.builder()
+    @Transactional
+    public JwtResponseDTO processOAuth2Success(OAuth2User oAuth2User, String intentRole, HttpServletRequest request) {
+        String provider = "GOOGLE";
+        String providerUserId = oAuth2User.getAttribute("sub");
+        if (providerUserId == null || providerUserId.isBlank()) {
+            providerUserId = oAuth2User.getName();
+        }
+
+        String email = oAuth2User.getAttribute("email");
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("OAuth provider did not return an email address.");
+        }
+        email = email.trim().toLowerCase();
+
+        String firstName = oAuth2User.getAttribute("given_name");
+        String lastName = oAuth2User.getAttribute("family_name");
+        String picture = oAuth2User.getAttribute("picture");
+
+        User user;
+        var existingIdentity = oauthIdentityRepository.findByProviderAndProviderUserId(provider, providerUserId);
+
+        if (existingIdentity.isPresent()) {
+            user = existingIdentity.get().getUser();
+        } else {
+            var existingUserByEmail = userRepository.findByEmail(email);
+            if (existingUserByEmail.isPresent()) {
+                user = existingUserByEmail.get();
+                OAuthIdentity identity = OAuthIdentity.builder()
+                        .user(user)
+                        .provider(provider)
+                        .providerUserId(providerUserId)
+                        .email(email)
+                        .build();
+                oauthIdentityRepository.save(identity);
+            } else {
+                if (intentRole == null || intentRole.isBlank()) {
+                    throw new BadRequestException("OAuth registration intent not found or expired. Please initiate registration from the artisan or client signup page.");
+                }
+
+                String normalizedIntent = intentRole.trim().toUpperCase();
+                String roleName;
+                AccountStatus initialStatus;
+                if (normalizedIntent.contains("ARTISAN")) {
+                    roleName = "ROLE_ARTISAN";
+                    initialStatus = AccountStatus.PENDING;
+                } else if (normalizedIntent.contains("CLIENT")) {
+                    roleName = "ROLE_CLIENT";
+                    initialStatus = AccountStatus.ACTIVE;
+                } else {
+                    throw new BadRequestException("Invalid OAuth registration role intent: " + intentRole);
+                }
+
+                Role role = roleRepository.findByName(roleName)
+                        .or(() -> roleRepository.findByName(roleName.replace("ROLE_", "")))
+                        .orElseGet(() -> {
+                            Role newRole = new Role();
+                            newRole.setName(roleName);
+                            newRole.setDescription(roleName + " role");
+                            return roleRepository.save(newRole);
+                        });
+
+                user = User.builder()
+                        .email(email)
+                        .password(null)
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .avatarUrl(picture)
+                        .status(initialStatus)
+                        .emailVerified(true)
+                        .emailVerifiedAt(LocalDateTime.now())
+                        .roles(new HashSet<>(Set.of(role)))
+                        .build();
+
+                user = userRepository.save(user);
+
+                OAuthIdentity identity = OAuthIdentity.builder()
+                        .user(user)
+                        .provider(provider)
+                        .providerUserId(providerUserId)
+                        .email(email)
+                        .build();
+                oauthIdentityRepository.save(identity);
+            }
+        }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        if (request != null) {
+            user.setLastLoginIp(extractClientIp(request));
+        }
+        userRepository.save(user);
+
+        return generateJwtResponse(user);
+    }
+
+    private JwtResponseDTO generateJwtResponse(User user) {
+        String accessToken = jwtUtils.generateAccessToken(user.getEmail());
+        RefreshToken refreshToken = refreshTokenService.createRefreshTokenForUser(user);
+
+        return JwtResponseDTO.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
+                .user(mapToSummaryDTO(user))
+                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                .build();
+    }
+
+    public UserSummaryDTO mapToSummaryDTO(User user) {
+        String primaryRole = user.getRoles().stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("ROLE_CLIENT");
+
+        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
+        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
+                || (user.getClient() != null && user.getClient().isPremium());
+        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
+                || (user.getClient() != null && user.getClient().isVerified());
+
+        return UserSummaryDTO.builder()
                 .id(user.getId())
-                .username(user.getUsername())
+                .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
-                .dateOfBirth(user.getDateOfBirth())
-                .status(user.getStatus())
+                .name(user.getName())
+                .role(primaryRole)
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .createdAt(user.getCreatedAt())
+                .accountStatus(user.getStatus())
+                .isPremium(isPremium)
+                .isValidated(isValidated)
+                .isTeacher(isTeacher)
                 .build();
+    }
+
+    public UserResponseDTO mapToDTO(User user) {
+        String primaryRole = user.getRoles().stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("ROLE_CLIENT");
+
+        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
+        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
+                || (user.getClient() != null && user.getClient().isPremium());
+        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
+                || (user.getClient() != null && user.getClient().isVerified());
+
+        return UserResponseDTO.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .name(user.getName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .status(user.getStatus())
+                .emailVerified(user.isEmailVerified())
+                .emailVerifiedAt(user.getEmailVerifiedAt())
+                .primaryRole(primaryRole)
+                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .isPremium(isPremium)
+                .isValidated(isValidated)
+                .isTeacher(isTeacher)
+                .bannedUntil(user.getBannedUntil())
+                .banReason(user.getBanReason())
+                .lastLoginAt(user.getLastLoginAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

@@ -19,6 +19,7 @@ public class AppProperties {
     private Email email = new Email();
     private Mailersend mailersend = new Mailersend();
     private Chargily chargily = new Chargily();
+    private OAuth oauth = new OAuth();
 
     @Data
     public static class Jwt {
@@ -63,5 +64,17 @@ public class AppProperties {
         private String secretKey;
         private String mode;
         private String webhookSecret;
+    }
+
+    @Data
+    public static class OAuth {
+        private Google google = new Google();
+
+        @Data
+        public static class Google {
+            private String clientId;
+            private String clientSecret;
+            private String redirectUri;
+        }
     }
 }

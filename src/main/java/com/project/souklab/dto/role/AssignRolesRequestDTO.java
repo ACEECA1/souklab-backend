@@ -7,7 +7,7 @@ import java.util.Set;
 
 @Data
 public class AssignRolesRequestDTO {
-    private Long userId;
+    private String userId;
 
     @NotEmpty(message = "At least one role is required")
     private Set<String> roleNames;

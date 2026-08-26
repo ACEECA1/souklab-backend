@@ -55,10 +55,14 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Security: Spring Security 6 -->
+        <!-- Security: Spring Security 6 & OAuth2 Client -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
 
         <!-- JWT: Java JSON Web Token (Authentication & Token Rotation) -->

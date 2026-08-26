@@ -1,21 +1,19 @@
 package com.project.souklab.controller.user;
 
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.dto.role.AssignRolesRequestDTO;
 import com.project.souklab.dto.role.BulkAssignRoleRequestDTO;
 import com.project.souklab.dto.role.RoleCreateRequestDTO;
 import com.project.souklab.dto.role.RoleResponseDTO;
+import com.project.souklab.dto.role.RoleUpdateRequestDTO;
 import com.project.souklab.service.user.RoleManagementService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import com.project.souklab.dto.role.RoleUpdateRequestDTO;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/roles")
@@ -32,7 +30,7 @@ public class RoleManagementController {
 
     @PutMapping("/{roleId}")
     public ResponseEntity<ApiResponse<RoleResponseDTO>> updateRole(
-            @PathVariable Long roleId,
+            @PathVariable String roleId,
             @Valid @RequestBody RoleUpdateRequestDTO request) {
         return ResponseEntity.ok(ApiResponse.success(roleManagementService.updateRole(roleId, request), "Role updated"));
     }

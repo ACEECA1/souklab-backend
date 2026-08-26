@@ -1,18 +1,18 @@
 package com.project.souklab.dto.notification;
 
+import com.project.souklab.model.NotificationType;
 import lombok.Builder;
 import lombok.Value;
 
 import java.time.LocalDateTime;
-import com.project.souklab.model.NotificationType;
 
 @Value
 @Builder
 public class NotificationResponseDTO {
-    Long id;
+    String id;
     String message;
     boolean isRead;
     NotificationType type;
-    Long targetId;
+    String targetId;
     LocalDateTime createdAt;
 }

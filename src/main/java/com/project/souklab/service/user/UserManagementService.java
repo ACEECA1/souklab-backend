@@ -1,28 +1,29 @@
 package com.project.souklab.service.user;
 
-import lombok.RequiredArgsConstructor;
+import com.project.souklab.dao.RoleRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.auth.UserResponseDTO;
 import com.project.souklab.dto.common.PaginatedResponse;
+import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ResourceNotFoundException;
+import com.project.souklab.model.AccountStatus;
+import com.project.souklab.model.AuditLogAction;
+import com.project.souklab.model.NotificationType;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
 import com.project.souklab.service.audit.AuditLogService;
+import com.project.souklab.service.notification.NotificationService;
 import com.project.souklab.service.security.RefreshTokenService;
-import com.project.souklab.exception.AppException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.stream.Collectors;
-import java.util.List;
-import java.util.HashSet;
-import com.project.souklab.model.NotificationType;
-import com.project.souklab.model.AuditLogAction;
 import java.time.LocalDateTime;
-import com.project.souklab.service.notification.NotificationService;
-import com.project.souklab.dao.RoleRepository;
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +38,7 @@ public class UserManagementService {
     /**
      * Retrieves a paginated list of all users in the system.
      *
+     * @param search optional search query for filtering by email or name
      * @param pageable the pagination parameters specifying page size, number, and sorting
      * @return a paginated response containing a list of all users as UserResponseDTOs
      */
@@ -57,12 +59,12 @@ public class UserManagementService {
      *
      * @param userId the unique identifier of the user to receive the roles
      * @param roleNames a list containing the names of the roles to be assigned
-     * @throws AppException if the user is not found by the provided ID
+     * @throws ResourceNotFoundException if the user is not found by the provided ID
      */
     @Transactional
-    public void assignRoles(Long userId, List<String> roleNames) {
+    public void assignRoles(String userId, List<String> roleNames) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
         
         List<Role> roles = roleRepository.findByNameIn(roleNames);
         user.setRoles(new HashSet<>(roles));
@@ -72,36 +74,36 @@ public class UserManagementService {
 
     /**
      * Retrieves a paginated list of users whose registrations are currently pending approval.
-     * Typically used by admins to vet new accounts before allowing them access.
+     * Typically used by admins to vet new artisan accounts before activating them.
      *
      * @param pageable the pagination parameters
      * @return a paginated response containing the list of pending UserResponseDTOs
      */
     @Transactional(readOnly = true)
     public PaginatedResponse<UserResponseDTO> getPendingUsers(Pageable pageable) {
-        Page<UserResponseDTO> page = userRepository.findByStatus(User.UserStatus.PENDING, pageable)
+        Page<UserResponseDTO> page = userRepository.findByStatus(AccountStatus.PENDING, pageable)
                 .map(this::mapToDTO);
         return PaginatedResponse.from(page);
     }
 
     /**
      * Approves a user's pending registration, transitioning their status from PENDING to ACTIVE.
-     * This grants them access to login and use the platform. It also sends a USER_APPROVED notification.
-     * Example Notification: "Your account has been approved and activated."
+     * This grants them full access to the platform and sends a validation notification.
      *
      * @param userId the unique identifier of the user to approve
-     * @throws AppException if the user is not found or is not currently in a PENDING state
+     * @throws ResourceNotFoundException if the user is not found
+     * @throws BadRequestException if the user is not in PENDING status
      */
     @Transactional
-    public void approveUser(Long userId) {
+    public void approveUser(String userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        if (user.getStatus() != User.UserStatus.PENDING) {
-            throw new AppException("User is not in PENDING status", HttpStatus.BAD_REQUEST);
+        if (user.getStatus() != AccountStatus.PENDING) {
+            throw new BadRequestException("User is not in PENDING status");
         }
 
-        user.setStatus(User.UserStatus.ACTIVE);
+        user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
 
         auditLogService.logAction(AuditLogAction.APPROVE_USER, "Approved user ID: " + userId);
@@ -109,18 +111,19 @@ public class UserManagementService {
     }
 
     /**
-     * Permanently bans a user account, changing its status to BANNED.
-     * This instantly invalidates all of the user's active refresh tokens, preventing new access tokens from being issued.
+     * Suspends a user account, changing its status to SUSPENDED.
+     * This instantly invalidates all active refresh tokens, preventing token refreshes.
      *
-     * @param userId the unique identifier of the user to ban
-     * @throws AppException if the user cannot be found
+     * @param userId the unique identifier of the user to ban/suspend
+     * @param reason the reason for suspension
+     * @throws ResourceNotFoundException if the user cannot be found
      */
     @Transactional
-    public void banUser(Long userId, String reason) {
+    public void banUser(String userId, String reason) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        user.setStatus(User.UserStatus.BANNED);
+        user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason);
         userRepository.save(user);
 
@@ -131,16 +134,17 @@ public class UserManagementService {
 
     /**
      * Imposes a temporary timeout on a user account by setting a 'bannedUntil' timestamp.
-     * Similar to a permanent ban, this destroys current refresh tokens, forcing a re-authentication attempt which will fail until the time expires.
+     * Invalidates active refresh tokens, preventing authentication until the timeout expires.
      *
      * @param userId the unique identifier of the user to timeout
      * @param minutes the duration of the timeout in minutes
-     * @throws AppException if the user cannot be found
+     * @param reason the reason for timeout
+     * @throws ResourceNotFoundException if the user cannot be found
      */
     @Transactional
-    public void timeoutUser(Long userId, int minutes, String reason) {
+    public void timeoutUser(String userId, int minutes, String reason) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         user.setBannedUntil(LocalDateTime.now().plusMinutes(minutes));
         user.setBanReason(reason);
@@ -152,14 +156,29 @@ public class UserManagementService {
     }
 
     private UserResponseDTO mapToDTO(User user) {
+        String primaryRole = user.getRoles().stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("ROLE_CLIENT");
+
+        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
+        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
+                || (user.getClient() != null && user.getClient().isPremium());
+        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
+                || (user.getClient() != null && user.getClient().isVerified());
+
         return UserResponseDTO.builder()
                 .id(user.getId())
-                .username(user.getUsername())
+                .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
-                .dateOfBirth(user.getDateOfBirth())
+                .name(user.getName())
                 .status(user.getStatus())
+                .primaryRole(primaryRole)
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .isPremium(isPremium)
+                .isValidated(isValidated)
+                .isTeacher(isTeacher)
                 .bannedUntil(user.getBannedUntil())
                 .banReason(user.getBanReason())
                 .createdAt(user.getCreatedAt())

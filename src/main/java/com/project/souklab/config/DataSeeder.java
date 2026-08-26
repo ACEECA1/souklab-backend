@@ -1,15 +1,17 @@
 package com.project.souklab.config;
 
-import lombok.RequiredArgsConstructor;
 import com.project.souklab.dao.RoleRepository;
 import com.project.souklab.dao.UserRepository;
+import com.project.souklab.model.AccountStatus;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,7 +35,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedRoles() {
-        List<String> roleNames = List.of("ADMIN", "ARTISAN", "CLIENT");
+        List<String> roleNames = List.of("ROLE_ADMIN", "ROLE_ARTISAN", "ROLE_CLIENT", "ADMIN", "ARTISAN", "CLIENT");
         for (String name : roleNames) {
             if (roleRepository.findByName(name).isEmpty()) {
                 Role role = new Role();
@@ -45,23 +47,25 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedAdminUser() {
-        Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
+        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                .or(() -> roleRepository.findByName("ADMIN"))
+                .orElseThrow();
 
         String defaultPassword = appProperties.getAdmin().getDefaultPassword();
         if (defaultPassword == null || defaultPassword.isBlank()) {
             throw new IllegalStateException("APP_ADMIN_DEFAULT_PASSWORD must be configured in the environment");
         }
 
-        User admin = new User();
-        admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode(defaultPassword));
-        admin.setFirstName("System");
-        admin.setLastName("Administrator");
-        admin.setStatus(User.UserStatus.ACTIVE);
-        
-        Set<Role> roles = new HashSet<>();
-        roles.add(adminRole);
-        admin.setRoles(roles);
+        User admin = User.builder()
+                .email("admin@souklab.dz")
+                .password(passwordEncoder.encode(defaultPassword))
+                .firstName("System")
+                .lastName("Administrator")
+                .status(AccountStatus.ACTIVE)
+                .emailVerified(true)
+                .emailVerifiedAt(LocalDateTime.now())
+                .roles(new HashSet<>(Set.of(adminRole)))
+                .build();
 
         userRepository.save(admin);
     }

@@ -1,21 +1,21 @@
 package com.project.souklab.service.notification;
 
-import lombok.RequiredArgsConstructor;
 import com.project.souklab.dao.NotificationRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.notification.NotificationResponseDTO;
+import com.project.souklab.exception.ResourceNotFoundException;
+import com.project.souklab.exception.UnauthorizedException;
 import com.project.souklab.model.Notification;
+import com.project.souklab.model.NotificationType;
 import com.project.souklab.model.User;
-import com.project.souklab.exception.AppException;
 import com.project.souklab.util.SecurityUtils;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import com.project.souklab.model.NotificationType;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -45,12 +45,12 @@ public class NotificationService {
      *
      * @param user the recipient of the notification
      * @param message the content of the notification
-     * @param type the type of notification (e.g. "UPVOTE", "REPLY")
-     * @param targetId the ID of the related entity
+     * @param type the type of notification
+     * @param targetId the UUID string ID of the related entity
      * @return a NotificationResponseDTO representing the newly created notification
      */
     @Transactional
-    public NotificationResponseDTO createForUser(User user, String message, NotificationType type, Long targetId) {
+    public NotificationResponseDTO createForUser(User user, String message, NotificationType type, String targetId) {
         Notification notification = new Notification();
         notification.setMessage(message);
         notification.setUser(user);
@@ -60,23 +60,23 @@ public class NotificationService {
 
         Notification saved = notificationRepository.save(notification);
         NotificationResponseDTO response = mapToDTO(saved);
-        messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/notifications", response);
+        messagingTemplate.convertAndSendToUser(user.getEmail(), "/queue/notifications", response);
         return response;
     }
 
     /**
-     * Creates or updates an aggregated notification. For example, grouping upvotes together.
+     * Creates or updates an aggregated notification.
      *
      * @param user the recipient of the notification
-     * @param type the type of notification (e.g., UPVOTE, REPLY)
-     * @param targetId the ID of the related entity
+     * @param type the type of notification
+     * @param targetId the UUID string ID of the related entity
      * @param baseMessage the base message format
      * @param count the number of occurrences to aggregate
-     * @param initiatorUsername the username of the latest initiator
+     * @param initiatorUsername the username/email of the latest initiator
      * @return a NotificationResponseDTO representing the newly created or updated notification
      */
     @Transactional
-    public NotificationResponseDTO createOrUpdateAggregatedNotification(User user, NotificationType type, Long targetId, String baseMessage, int count, String initiatorUsername) {
+    public NotificationResponseDTO createOrUpdateAggregatedNotification(User user, NotificationType type, String targetId, String baseMessage, int count, String initiatorUsername) {
         Optional<Notification> opt = notificationRepository.findFirstByUserAndTypeAndTargetIdOrderByCreatedAtDesc(user, type, targetId);
         Notification notification;
         String message;
@@ -102,7 +102,7 @@ public class NotificationService {
 
         Notification saved = notificationRepository.save(notification);
         NotificationResponseDTO response = mapToDTO(saved);
-        messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/notifications", response);
+        messagingTemplate.convertAndSendToUser(user.getEmail(), "/queue/notifications", response);
         return response;
     }
 
@@ -115,7 +115,7 @@ public class NotificationService {
     @Transactional
     public void notifyAdmins(String message) {
         userRepository.findAll().stream()
-                .filter(user -> user.getRoles().stream().anyMatch(role -> "ADMIN".equals(role.getName())))
+                .filter(user -> user.getRoles().stream().anyMatch(role -> role.getName().contains("ADMIN")))
                 .forEach(admin -> createForUser(admin, message));
     }
 
@@ -138,13 +138,13 @@ public class NotificationService {
      *
      * @param notificationId the unique identifier of the notification to mark as read
      * @return the updated NotificationResponseDTO reflecting the read status
-     * @throws AppException if the notification cannot be found or doesn't belong to the user
+     * @throws ResourceNotFoundException if the notification cannot be found or doesn't belong to the user
      */
     @Transactional
-    public NotificationResponseDTO markAsRead(Long notificationId) {
+    public NotificationResponseDTO markAsRead(String notificationId) {
         User user = getCurrentUser();
         Notification notification = notificationRepository.findByIdAndUser(notificationId, user)
-                .orElseThrow(() -> new AppException("Notification not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
         if (!notification.isRead()) {
             notification.setRead(true);
             notificationRepository.save(notification);
@@ -156,7 +156,7 @@ public class NotificationService {
      * Marks all unread notifications belonging to the current authenticated user as 'read'.
      * Useful for a "mark all as read" button in the UI.
      *
-     * @throws AppException if the current user is not authenticated or not found
+     * @throws UnauthorizedException if the current user is not authenticated
      */
     @Transactional
     public void markAllAsRead() {
@@ -167,12 +167,13 @@ public class NotificationService {
     }
 
     private User getCurrentUser() {
-        String username = SecurityUtils.getCurrentUsername();
-        if (username == null) {
-            throw new AppException("Not authenticated", HttpStatus.UNAUTHORIZED);
+        String email = SecurityUtils.getCurrentUsername();
+        if (email == null) {
+            throw new UnauthorizedException("Not authenticated");
         }
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+        return userRepository.findByEmail(email)
+                .or(() -> userRepository.findByUsername(email))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 
     private NotificationResponseDTO mapToDTO(Notification notification) {

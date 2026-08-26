@@ -1,26 +1,27 @@
 package com.project.souklab.service.user;
 
-import lombok.RequiredArgsConstructor;
 import com.project.souklab.dao.RoleRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.dto.role.RoleCreateRequestDTO;
-import com.project.souklab.dto.role.RoleUpdateRequestDTO;
 import com.project.souklab.dto.role.RoleResponseDTO;
+import com.project.souklab.dto.role.RoleUpdateRequestDTO;
+import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ConflictException;
+import com.project.souklab.exception.ResourceNotFoundException;
+import com.project.souklab.model.AuditLogAction;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
 import com.project.souklab.service.audit.AuditLogService;
-import com.project.souklab.exception.AppException;
+import com.project.souklab.service.notification.NotificationService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
-import com.project.souklab.model.AuditLogAction;
-import com.project.souklab.service.notification.NotificationService;
 
 @Service
 @RequiredArgsConstructor
@@ -37,12 +38,12 @@ public class RoleManagementService {
      *
      * @param dto the data transfer object containing the role's name and description
      * @return a RoleResponseDTO describing the successfully created role
-     * @throws AppException if the role name is taken
+     * @throws ConflictException if the role name is taken
      */
     @Transactional
     public RoleResponseDTO createRole(RoleCreateRequestDTO dto) {
         if (roleRepository.findByName(dto.getName()).isPresent()) {
-            throw new AppException("Role already exists", HttpStatus.BAD_REQUEST);
+            throw new ConflictException("Role already exists: " + dto.getName());
         }
 
         Role role = new Role();
@@ -60,12 +61,12 @@ public class RoleManagementService {
      * @param roleId the unique identifier of the role to update
      * @param dto the data transfer object containing the updated fields
      * @return the updated RoleResponseDTO
-     * @throws AppException if the role is not found
+     * @throws ResourceNotFoundException if the role is not found
      */
     @Transactional
-    public RoleResponseDTO updateRole(Long roleId, RoleUpdateRequestDTO dto) {
+    public RoleResponseDTO updateRole(String roleId, RoleUpdateRequestDTO dto) {
         Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new AppException("Role not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
 
         if (dto.getDescription() != null) {
             role.setDescription(dto.getDescription());
@@ -93,16 +94,17 @@ public class RoleManagementService {
      *
      * @param userId the unique identifier of the user receiving the roles
      * @param roleNames a set of role names to append to the user's current roles
-     * @throws AppException if the user or any role name is not found
+     * @throws ResourceNotFoundException if the user is not found
+     * @throws BadRequestException if any role name is not found
      */
     @Transactional
-    public void assignRolesToUser(Long userId, Set<String> roleNames) {
+    public void assignRolesToUser(String userId, Set<String> roleNames) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         for (String roleName : roleNames) {
             Role role = roleRepository.findByName(roleName)
-                    .orElseThrow(() -> new AppException("Role not found: " + roleName, HttpStatus.BAD_REQUEST));
+                    .orElseThrow(() -> new BadRequestException("Role not found: " + roleName));
             user.getRoles().add(role);
         }
         userRepository.save(user);
@@ -115,16 +117,17 @@ public class RoleManagementService {
      *
      * @param roleName the name of the role being assigned
      * @param userIds a list of user IDs to receive the role
-     * @throws AppException if the role or any of the provided users are not found
+     * @throws BadRequestException if the role is not found
+     * @throws ResourceNotFoundException if any of the provided users are not found
      */
     @Transactional
-    public void assignRoleToUsersBulk(String roleName, List<Long> userIds) {
+    public void assignRoleToUsersBulk(String roleName, List<String> userIds) {
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new AppException("Role not found: " + roleName, HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new BadRequestException("Role not found: " + roleName));
 
         List<User> users = userRepository.findAllById(userIds);
         if (users.size() != userIds.size()) {
-            throw new AppException("One or more users not found", HttpStatus.NOT_FOUND);
+            throw new ResourceNotFoundException("One or more users not found");
         }
 
         for (User user : users) {

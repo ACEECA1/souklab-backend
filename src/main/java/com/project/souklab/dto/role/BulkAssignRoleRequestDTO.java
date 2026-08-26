@@ -12,5 +12,5 @@ public class BulkAssignRoleRequestDTO {
     private String roleName;
 
     @NotEmpty(message = "User IDs are required")
-    private List<Long> userIds;
+    private List<String> userIds;
 }
