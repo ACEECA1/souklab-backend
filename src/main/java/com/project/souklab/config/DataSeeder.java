@@ -32,7 +32,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedRoles() {
-        List<String> roleNames = List.of("ADMIN", "MODERATOR", "ARTISAN", "CLIENT");
+        List<String> roleNames = List.of("ADMIN", "ARTISAN", "CLIENT");
         for (String name : roleNames) {
             if (roleRepository.findByName(name).isEmpty()) {
                 Role role = new Role();

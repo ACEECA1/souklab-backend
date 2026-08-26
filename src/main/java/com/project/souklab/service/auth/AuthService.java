@@ -1,10 +1,8 @@
 package com.project.souklab.service.auth;
 
 import lombok.RequiredArgsConstructor;
-import com.project.souklab.dao.PasswordResetRequestRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.auth.*;
-import com.project.souklab.model.PasswordResetRequest;
 import com.project.souklab.model.RefreshToken;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
@@ -29,7 +27,6 @@ import java.util.stream.Collectors;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordResetRequestRepository passwordResetRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final NotificationService notificationService;
@@ -159,45 +156,25 @@ public class AuthService {
     }
 
     /**
-     * Initiates a password reset process for a user who forgot their password.
-     * A PasswordResetRequest is generated with a PENDING status, and admins are notified to approve it.
+     * Initiates a password reset process for a user.
+     * Token-based email reset will be implemented in Phase 2.
      *
-     * @param request the data transfer object containing the username of the account needing a reset
-     * @throws AppException if the user associated with the username is not found
+     * @param request the data transfer object containing the username/email of the account
      */
     @Transactional
     public void forgotPassword(ForgotPasswordRequestDTO request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
-
-        PasswordResetRequest resetRequest = new PasswordResetRequest();
-        resetRequest.setUser(user);
-        resetRequest.setStatus(PasswordResetRequest.ResetStatus.PENDING);
-        
-        passwordResetRequestRepository.save(resetRequest);
-        notificationService.notifyAdmins("Password reset requested for user: " + user.getUsername());
+        // Phase 2 implementation will generate a secure reset token and email it to the user
     }
 
     /**
      * Completes the password reset process by applying the new password.
-     * This requires an approved reset token (usually provided by an admin).
-     * After successful password change, the reset token is marked as CONSUMED.
+     * Token-based email reset will be implemented in Phase 2.
      *
-     * @param request the data transfer object containing the valid reset token and the new password
-     * @throws AppException if the reset token is invalid, expired, or not approved
+     * @param request the data transfer object containing the reset token and the new password
      */
     @Transactional
     public void resetPassword(ResetPasswordRequestDTO request) {
-        PasswordResetRequest resetRequest = passwordResetRequestRepository.findByResetTokenAndStatus(
-                request.getResetToken(), PasswordResetRequest.ResetStatus.APPROVED)
-                .orElseThrow(() -> new AppException("Invalid or expired reset token", HttpStatus.BAD_REQUEST));
-
-        User user = resetRequest.getUser();
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
-
-        resetRequest.setStatus(PasswordResetRequest.ResetStatus.CONSUMED);
-        passwordResetRequestRepository.save(resetRequest);
+        // Phase 2 implementation will validate token and update password
     }
 
     /**

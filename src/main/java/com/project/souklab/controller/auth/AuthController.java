@@ -64,7 +64,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
         authService.forgotPassword(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Password reset requested successfully. Please wait for admin approval."));
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset initiated successfully."));
     }
 
     @PostMapping("/reset-password")

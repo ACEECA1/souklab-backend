@@ -1,12 +1,9 @@
 package com.project.souklab.service.user;
 
 import lombok.RequiredArgsConstructor;
-import com.project.souklab.dao.PasswordResetRequestRepository;
 import com.project.souklab.dao.UserRepository;
-import com.project.souklab.dto.auth.PasswordResetRequestResponseDTO;
 import com.project.souklab.dto.auth.UserResponseDTO;
 import com.project.souklab.dto.common.PaginatedResponse;
-import com.project.souklab.model.PasswordResetRequest;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
 import com.project.souklab.service.audit.AuditLogService;
@@ -18,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.List;
 import java.util.HashSet;
@@ -34,7 +30,6 @@ public class UserManagementService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final PasswordResetRequestRepository passwordResetRequestRepository;
     private final AuditLogService auditLogService;
     private final RefreshTokenService refreshTokenService;
     private final NotificationService notificationService;
@@ -154,76 +149,6 @@ public class UserManagementService {
         refreshTokenService.deleteByUserId(userId);
 
         auditLogService.logAction(AuditLogAction.TIMEOUT_USER, "Timed out user ID: " + userId + " for " + minutes + " minutes. Reason: " + reason);
-    }
-
-    /**
-     * Retrieves a paginated list of password reset requests that have a PENDING status.
-     * Admins review these requests to determine if they are legitimate.
-     *
-     * @param pageable the pagination parameters
-     * @return a paginated response of pending reset requests
-     */
-    @Transactional(readOnly = true)
-    public PaginatedResponse<PasswordResetRequestResponseDTO> getPendingPasswordResets(Pageable pageable) {
-        Page<PasswordResetRequestResponseDTO> page = passwordResetRequestRepository
-                .findByStatus(PasswordResetRequest.ResetStatus.PENDING, pageable)
-                .map(req -> PasswordResetRequestResponseDTO.builder()
-                        .id(req.getId())
-                        .username(req.getUser().getUsername())
-                        .status(req.getStatus())
-                        .createdAt(req.getCreatedAt())
-                        .build());
-        return PaginatedResponse.from(page);
-    }
-
-    /**
-     * Approves a pending password reset request.
-     * This generates a secure UUID token that the user must provide alongside their new password to complete the reset.
-     *
-     * @param requestId the unique identifier of the pending PasswordResetRequest
-     * @return the generated secure UUID reset token
-     * @throws AppException if the request is missing or not in a PENDING state
-     */
-    @Transactional
-    public String approvePasswordReset(Long requestId) {
-        PasswordResetRequest request = passwordResetRequestRepository.findById(requestId)
-                .orElseThrow(() -> new AppException("Password reset request not found", HttpStatus.NOT_FOUND));
-
-        if (request.getStatus() != PasswordResetRequest.ResetStatus.PENDING) {
-            throw new AppException("Request is not PENDING", HttpStatus.BAD_REQUEST);
-        }
-
-        request.setStatus(PasswordResetRequest.ResetStatus.APPROVED);
-        String token = UUID.randomUUID().toString();
-        request.setResetToken(token);
-        
-        passwordResetRequestRepository.save(request);
-        auditLogService.logAction(AuditLogAction.APPROVE_PASSWORD_RESET, "Approved password reset for user ID: " + request.getUser().getId());
-        
-        
-        
-        return token;
-    }
-
-    /**
-     * Rejects a pending password reset request.
-     * This is used if the admin suspects the reset request was fraudulent or accidental.
-     *
-     * @param requestId the unique identifier of the PasswordResetRequest to reject
-     * @throws AppException if the request is not found or is not in a PENDING state
-     */
-    @Transactional
-    public void rejectPasswordReset(Long requestId) {
-        PasswordResetRequest request = passwordResetRequestRepository.findById(requestId)
-                .orElseThrow(() -> new AppException("Password reset request not found", HttpStatus.NOT_FOUND));
-
-        if (request.getStatus() != PasswordResetRequest.ResetStatus.PENDING) {
-            throw new AppException("Request is not PENDING", HttpStatus.BAD_REQUEST);
-        }
-
-        request.setStatus(PasswordResetRequest.ResetStatus.REJECTED);
-        passwordResetRequestRepository.save(request);
-        auditLogService.logAction(AuditLogAction.REJECT_PASSWORD_RESET, "Rejected password reset for user ID: " + request.getUser().getId());
     }
 
     private UserResponseDTO mapToDTO(User user) {

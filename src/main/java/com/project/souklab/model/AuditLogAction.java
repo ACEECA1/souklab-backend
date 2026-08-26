@@ -12,8 +12,6 @@ public enum AuditLogAction {
     APPROVE_USER,
     BAN_USER,
     TIMEOUT_USER,
-    APPROVE_PASSWORD_RESET,
-    REJECT_PASSWORD_RESET,
 
     // Artisan Validation
     APPROVE_ARTISAN,
