@@ -31,12 +31,6 @@ public class UserManagementController {
         return ResponseEntity.ok(ApiResponse.success(userManagementService.getAllUsers(search, pageable)));
     }
 
-    @PutMapping("/{id}/roles")
-    public ResponseEntity<ApiResponse<Void>> assignRoles(@PathVariable String id, @RequestBody List<String> roleNames) {
-        userManagementService.assignRoles(id, roleNames);
-        return ResponseEntity.ok(ApiResponse.success(null, "Roles assigned successfully"));
-    }
-
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse<PaginatedResponse<UserResponseDTO>>> getPendingUsers(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {

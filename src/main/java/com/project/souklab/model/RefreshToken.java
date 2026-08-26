@@ -10,7 +10,7 @@ import java.time.Instant;
     name = "refresh_tokens",
     indexes = {
         @Index(name = "uk_refresh_tokens_token", columnList = "token", unique = true),
-        @Index(name = "idx_refresh_tokens_user_id", columnList = "user_id"),
+        @Index(name = "uk_refresh_tokens_user_id", columnList = "user_id", unique = true),
         @Index(name = "idx_refresh_tokens_expiry", columnList = "expiry_date")
     }
 )
@@ -21,8 +21,8 @@ import java.time.Instant;
 @Builder
 public class RefreshToken extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, unique = true)
     private User user;
 
     @Column(nullable = false, unique = true)

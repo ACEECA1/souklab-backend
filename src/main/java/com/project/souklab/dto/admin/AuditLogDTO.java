@@ -1,14 +1,37 @@
 package com.project.souklab.dto.admin;
 
-import lombok.Data;
-import java.time.LocalDateTime;
+import com.project.souklab.model.AuditLog;
 import com.project.souklab.model.AuditLogAction;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AuditLogDTO {
-    private Long id;
+    private String id;
     private AuditLogAction action;
     private String details;
-    private String username;
+    private String userEmail;
+    private String userId;
     private LocalDateTime createdAt;
+
+    public static AuditLogDTO from(AuditLog entity) {
+        if (entity == null) {
+            return null;
+        }
+        return AuditLogDTO.builder()
+                .id(entity.getId())
+                .action(entity.getAction())
+                .details(entity.getDetails())
+                .userId(entity.getUser() != null ? entity.getUser().getId() : null)
+                .userEmail(entity.getUser() != null ? entity.getUser().getEmail() : null)
+                .createdAt(entity.getCreatedAt())
+                .build();
+    }
 }

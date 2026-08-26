@@ -1,17 +1,14 @@
 package com.project.souklab.service.user;
 
+import com.project.souklab.dao.ArtisanProfileRepository;
+import com.project.souklab.dao.ClientRepository;
 import com.project.souklab.dao.RoleRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.common.PaginatedResponse;
-import com.project.souklab.dto.role.RoleCreateRequestDTO;
 import com.project.souklab.dto.role.RoleResponseDTO;
-import com.project.souklab.dto.role.RoleUpdateRequestDTO;
 import com.project.souklab.exception.BadRequestException;
-import com.project.souklab.exception.ConflictException;
 import com.project.souklab.exception.ResourceNotFoundException;
-import com.project.souklab.model.AuditLogAction;
-import com.project.souklab.model.Role;
-import com.project.souklab.model.User;
+import com.project.souklab.model.*;
 import com.project.souklab.service.audit.AuditLogService;
 import com.project.souklab.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -29,55 +27,13 @@ public class RoleManagementService {
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    private final ArtisanProfileRepository artisanProfileRepository;
+    private final ClientRepository clientRepository;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
 
     /**
-     * Creates a new role.
-     * Throws an exception if a role with the same name already exists.
-     *
-     * @param dto the data transfer object containing the role's name and description
-     * @return a RoleResponseDTO describing the successfully created role
-     * @throws ConflictException if the role name is taken
-     */
-    @Transactional
-    public RoleResponseDTO createRole(RoleCreateRequestDTO dto) {
-        if (roleRepository.findByName(dto.getName()).isPresent()) {
-            throw new ConflictException("Role already exists: " + dto.getName());
-        }
-
-        Role role = new Role();
-        role.setName(dto.getName());
-        role.setDescription(dto.getDescription());
-
-        Role saved = roleRepository.save(role);
-        auditLogService.logAction(AuditLogAction.CREATE_ROLE, "Created role: " + saved.getName());
-        return mapToDTO(saved);
-    }
-
-    /**
-     * Updates an existing role's description.
-     *
-     * @param roleId the unique identifier of the role to update
-     * @param dto the data transfer object containing the updated fields
-     * @return the updated RoleResponseDTO
-     * @throws ResourceNotFoundException if the role is not found
-     */
-    @Transactional
-    public RoleResponseDTO updateRole(String roleId, RoleUpdateRequestDTO dto) {
-        Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
-
-        if (dto.getDescription() != null) {
-            role.setDescription(dto.getDescription());
-        }
-        Role saved = roleRepository.save(role);
-        auditLogService.logAction(AuditLogAction.UPDATE_ROLE, "Updated role: " + saved.getName());
-        return mapToDTO(saved);
-    }
-
-    /**
-     * Retrieves a paginated list of all roles configured in the system.
+     * Retrieves a paginated list of all system roles (ROLE_ADMIN, ROLE_ARTISAN, ROLE_CLIENT).
      *
      * @param pageable the pagination parameters
      * @return a paginated response of role DTOs
@@ -90,52 +46,86 @@ public class RoleManagementService {
     }
 
     /**
-     * Assigns one or multiple roles to a specific user.
+     * Safely assigns a single, mutually exclusive role to a user.
+     * Replaces any existing roles and ensures corresponding profile rows (ArtisanProfile or Client)
+     * exist so the user is in a consistent state without altering AccountStatus.
      *
-     * @param userId the unique identifier of the user receiving the roles
-     * @param roleNames a set of role names to append to the user's current roles
-     * @throws ResourceNotFoundException if the user is not found
-     * @throws BadRequestException if any role name is not found
+     * @param userId the unique identifier of the user receiving the role
+     * @param roleInput the target role name (e.g. ROLE_ARTISAN, ROLE_CLIENT, ROLE_ADMIN)
+     * @throws ResourceNotFoundException if the user or role is not found
+     * @throws BadRequestException if the role name is invalid
      */
     @Transactional
-    public void assignRolesToUser(String userId, Set<String> roleNames) {
+    public void assignRoleToUser(String userId, String roleInput) {
+        String roleName = normalizeRoleName(roleInput);
+
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        for (String roleName : roleNames) {
-            Role role = roleRepository.findByName(roleName)
-                    .orElseThrow(() -> new BadRequestException("Role not found: " + roleName));
-            user.getRoles().add(role);
+        user.setRoles(new HashSet<>(Set.of(role)));
+
+        if (roleName.equals("ROLE_ARTISAN")) {
+            if (user.getArtisanProfile() == null && artisanProfileRepository.findById(userId).isEmpty()) {
+                ArtisanProfile profile = ArtisanProfile.builder()
+                        .user(user)
+                        .build();
+                artisanProfileRepository.save(profile);
+                user.setArtisanProfile(profile);
+            }
+        } else if (roleName.equals("ROLE_CLIENT")) {
+            if (user.getClient() == null && clientRepository.findById(userId).isEmpty()) {
+                Client client = Client.builder()
+                        .user(user)
+                        .build();
+                clientRepository.save(client);
+                user.setClient(client);
+            }
         }
+
         userRepository.save(user);
-        auditLogService.logAction(AuditLogAction.ASSIGN_ROLE, "Assigned roles to user ID: " + userId);
-        notificationService.createForUser(user, "You have been assigned the following roles: " + String.join(", ", roleNames));
+
+        auditLogService.logAction(AuditLogAction.ASSIGN_ROLE, "Assigned role " + roleName + " to user ID: " + userId);
+        notificationService.createForUser(user, "Your account role has been updated to: " + roleName);
     }
 
     /**
-     * Assigns a single role to multiple users at once.
+     * Reassigns a single role to multiple users at once.
      *
-     * @param roleName the name of the role being assigned
+     * @param roleInput the name of the role being assigned
      * @param userIds a list of user IDs to receive the role
-     * @throws BadRequestException if the role is not found
+     * @throws BadRequestException if the role name is invalid
      * @throws ResourceNotFoundException if any of the provided users are not found
      */
     @Transactional
-    public void assignRoleToUsersBulk(String roleName, List<String> userIds) {
-        Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new BadRequestException("Role not found: " + roleName));
-
-        List<User> users = userRepository.findAllById(userIds);
-        if (users.size() != userIds.size()) {
-            throw new ResourceNotFoundException("One or more users not found");
+    public void assignRoleToUsersBulk(String roleInput, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            throw new BadRequestException("At least one user ID is required");
         }
 
-        for (User user : users) {
-            user.getRoles().add(role);
-            notificationService.createForUser(user, "You have been assigned the following role: " + roleName);
+        String roleName = normalizeRoleName(roleInput);
+
+        for (String userId : userIds) {
+            assignRoleToUser(userId, roleName);
         }
-        userRepository.saveAll(users);
+
         auditLogService.logAction(AuditLogAction.ASSIGN_ROLE_BULK, "Assigned role " + roleName + " to users: " + userIds);
+    }
+
+    private String normalizeRoleName(String roleInput) {
+        if (roleInput == null || roleInput.isBlank()) {
+            throw new BadRequestException("Role name is required");
+        }
+        String roleName = roleInput.trim().toUpperCase();
+        if (!roleName.startsWith("ROLE_")) {
+            roleName = "ROLE_" + roleName;
+        }
+        if (!roleName.equals("ROLE_ADMIN") && !roleName.equals("ROLE_ARTISAN") && !roleName.equals("ROLE_CLIENT")) {
+            throw new BadRequestException("Invalid role: " + roleInput + ". Allowed roles are ROLE_ADMIN, ROLE_ARTISAN, or ROLE_CLIENT.");
+        }
+        return roleName;
     }
 
     private RoleResponseDTO mapToDTO(Role role) {

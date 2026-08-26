@@ -35,7 +35,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedRoles() {
-        List<String> roleNames = List.of("ROLE_ADMIN", "ROLE_ARTISAN", "ROLE_CLIENT", "ADMIN", "ARTISAN", "CLIENT");
+        List<String> roleNames = List.of("ROLE_ADMIN", "ROLE_ARTISAN", "ROLE_CLIENT");
         for (String name : roleNames) {
             if (roleRepository.findByName(name).isEmpty()) {
                 Role role = new Role();
@@ -48,8 +48,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedAdminUser() {
         Role adminRole = roleRepository.findByName("ROLE_ADMIN")
-                .or(() -> roleRepository.findByName("ADMIN"))
-                .orElseThrow();
+                .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN role not found. Seed roles first."));
 
         String defaultPassword = appProperties.getAdmin().getDefaultPassword();
         if (defaultPassword == null || defaultPassword.isBlank()) {

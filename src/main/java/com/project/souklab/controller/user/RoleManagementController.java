@@ -2,11 +2,9 @@ package com.project.souklab.controller.user;
 
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.dto.common.PaginatedResponse;
-import com.project.souklab.dto.role.AssignRolesRequestDTO;
+import com.project.souklab.dto.role.AssignRoleRequestDTO;
 import com.project.souklab.dto.role.BulkAssignRoleRequestDTO;
-import com.project.souklab.dto.role.RoleCreateRequestDTO;
 import com.project.souklab.dto.role.RoleResponseDTO;
-import com.project.souklab.dto.role.RoleUpdateRequestDTO;
 import com.project.souklab.service.user.RoleManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,18 +21,6 @@ public class RoleManagementController {
 
     private final RoleManagementService roleManagementService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<RoleResponseDTO>> createRole(@Valid @RequestBody RoleCreateRequestDTO request) {
-        return ResponseEntity.ok(ApiResponse.success(roleManagementService.createRole(request), "Role created"));
-    }
-
-    @PutMapping("/{roleId}")
-    public ResponseEntity<ApiResponse<RoleResponseDTO>> updateRole(
-            @PathVariable String roleId,
-            @Valid @RequestBody RoleUpdateRequestDTO request) {
-        return ResponseEntity.ok(ApiResponse.success(roleManagementService.updateRole(roleId, request), "Role updated"));
-    }
-
     @GetMapping
     public ResponseEntity<ApiResponse<PaginatedResponse<RoleResponseDTO>>> getRoles(
             @RequestParam(defaultValue = "0") int page,
@@ -43,9 +29,9 @@ public class RoleManagementController {
     }
 
     @PostMapping("/assign")
-    public ResponseEntity<ApiResponse<Void>> assignRolesToUser(@Valid @RequestBody AssignRolesRequestDTO request) {
-        roleManagementService.assignRolesToUser(request.getUserId(), request.getRoleNames());
-        return ResponseEntity.ok(ApiResponse.success(null, "Roles assigned successfully"));
+    public ResponseEntity<ApiResponse<Void>> assignRoleToUser(@Valid @RequestBody AssignRoleRequestDTO request) {
+        roleManagementService.assignRoleToUser(request.getUserId(), request.getRoleName());
+        return ResponseEntity.ok(ApiResponse.success(null, "Role assigned successfully"));
     }
 
     @PostMapping("/assign-bulk")

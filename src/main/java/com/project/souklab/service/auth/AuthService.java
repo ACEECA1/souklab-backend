@@ -68,7 +68,6 @@ public class AuthService {
         }
 
         Role assignedRole = roleRepository.findByName(roleName)
-                .or(() -> roleRepository.findByName(roleInput.replace("ROLE_", "")))
                 .orElseGet(() -> {
                     Role newRole = new Role();
                     newRole.setName(roleName);
@@ -122,7 +121,6 @@ public class AuthService {
 
         String email = identifier.toLowerCase();
         User user = userRepository.findByEmail(email)
-                .or(() -> userRepository.findByUsername(email))
                 .orElseThrow(() -> new UnauthorizedException("Invalid email or password."));
 
         if (user.getPassword() == null || user.getPassword().isBlank()) {
@@ -218,9 +216,9 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
         boolean isArtisan = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equalsIgnoreCase("ROLE_ARTISAN") || r.getName().equalsIgnoreCase("ARTISAN"));
+                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
         boolean isClient = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equalsIgnoreCase("ROLE_CLIENT") || r.getName().equalsIgnoreCase("CLIENT"));
+                .anyMatch(r -> r.getName().equals("ROLE_CLIENT"));
 
         if (isArtisan) {
             ArtisanProfile profile = artisanProfileRepository.findById(user.getId())
@@ -311,7 +309,6 @@ public class AuthService {
                 }
 
                 Role role = roleRepository.findByName(roleName)
-                        .or(() -> roleRepository.findByName(roleName.replace("ROLE_", "")))
                         .orElseGet(() -> {
                             Role newRole = new Role();
                             newRole.setName(roleName);

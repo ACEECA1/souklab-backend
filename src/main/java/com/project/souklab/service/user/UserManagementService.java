@@ -1,6 +1,5 @@
 package com.project.souklab.service.user;
 
-import com.project.souklab.dao.RoleRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.auth.UserResponseDTO;
 import com.project.souklab.dto.common.PaginatedResponse;
@@ -21,8 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
 public class UserManagementService {
 
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
     private final AuditLogService auditLogService;
     private final RefreshTokenService refreshTokenService;
     private final NotificationService notificationService;
@@ -54,25 +52,6 @@ public class UserManagementService {
     }
 
     /**
-     * Assigns a specific set of roles to a user based on role names.
-     * Replaces any existing roles with the newly provided set of roles and logs the action in the audit log.
-     *
-     * @param userId the unique identifier of the user to receive the roles
-     * @param roleNames a list containing the names of the roles to be assigned
-     * @throws ResourceNotFoundException if the user is not found by the provided ID
-     */
-    @Transactional
-    public void assignRoles(String userId, List<String> roleNames) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-        
-        List<Role> roles = roleRepository.findByNameIn(roleNames);
-        user.setRoles(new HashSet<>(roles));
-        userRepository.save(user);
-        auditLogService.logAction(AuditLogAction.ASSIGN_ROLE, "Assigned roles to user ID: " + userId);
-    }
-
-    /**
      * Retrieves a paginated list of users whose registrations are currently pending approval.
      * Typically used by admins to vet new artisan accounts before activating them.
      *
@@ -88,11 +67,11 @@ public class UserManagementService {
 
     /**
      * Approves a user's pending registration, transitioning their status from PENDING to ACTIVE.
-     * This grants them full access to the platform and sends a validation notification.
+     * Logs the action and triggers an approval notification to the user.
      *
      * @param userId the unique identifier of the user to approve
      * @throws ResourceNotFoundException if the user is not found
-     * @throws BadRequestException if the user is not in PENDING status
+     * @throws BadRequestException if the user is not in a PENDING status
      */
     @Transactional
     public void approveUser(String userId) {
@@ -100,23 +79,23 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         if (user.getStatus() != AccountStatus.PENDING) {
-            throw new BadRequestException("User is not in PENDING status");
+            throw new BadRequestException("User is not pending approval. Current status: " + user.getStatus());
         }
 
         user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
 
         auditLogService.logAction(AuditLogAction.APPROVE_USER, "Approved user ID: " + userId);
-        notificationService.createForUser(user, "Your account has been approved and activated.", NotificationType.ACCOUNT_VALIDATED, user.getId());
+        notificationService.createForUser(user, "Your account has been approved and is now active!", NotificationType.ACCOUNT_VALIDATED, user.getId());
     }
 
     /**
-     * Suspends a user account, changing its status to SUSPENDED.
-     * This instantly invalidates all active refresh tokens, preventing token refreshes.
+     * Permanently or indefinitely bans a user from the platform.
+     * Immediately revokes active refresh tokens for the user to force complete logout.
      *
-     * @param userId the unique identifier of the user to ban/suspend
-     * @param reason the reason for suspension
-     * @throws ResourceNotFoundException if the user cannot be found
+     * @param userId the unique identifier of the user to ban
+     * @param reason the administrative justification for the ban
+     * @throws ResourceNotFoundException if the user is not found
      */
     @Transactional
     public void banUser(String userId, String reason) {
@@ -124,64 +103,78 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         user.setStatus(AccountStatus.SUSPENDED);
-        user.setBanReason(reason);
+        user.setBanReason(reason != null ? reason : "Account banned by administrator");
+        user.setBannedUntil(LocalDateTime.now().plusYears(100)); // Indefinite ban
         userRepository.save(user);
 
-        refreshTokenService.deleteByUserId(userId);
+        // Invalidate tokens for security
+        refreshTokenService.deleteByUser(user);
 
         auditLogService.logAction(AuditLogAction.BAN_USER, "Banned user ID: " + userId + ". Reason: " + reason);
+        notificationService.createForUser(user, "Your account has been permanently suspended. Reason: " + reason, NotificationType.ACCOUNT_SUSPENDED, user.getId());
     }
 
     /**
-     * Imposes a temporary timeout on a user account by setting a 'bannedUntil' timestamp.
-     * Invalidates active refresh tokens, preventing authentication until the timeout expires.
+     * Temporarily suspends (timeouts) a user for a designated duration in minutes.
+     * Immediately revokes active refresh tokens to force the user to log out during the timeout.
      *
      * @param userId the unique identifier of the user to timeout
-     * @param minutes the duration of the timeout in minutes
-     * @param reason the reason for timeout
-     * @throws ResourceNotFoundException if the user cannot be found
+     * @param minutes the duration of the suspension in minutes
+     * @param reason the administrative justification for the timeout
+     * @throws ResourceNotFoundException if the user is not found
+     * @throws BadRequestException if minutes is non-positive
      */
     @Transactional
     public void timeoutUser(String userId, int minutes, String reason) {
+        if (minutes <= 0) {
+            throw new BadRequestException("Timeout duration must be greater than 0 minutes");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
+        user.setStatus(AccountStatus.SUSPENDED);
+        user.setBanReason(reason != null ? reason : "Account timed out by administrator");
         user.setBannedUntil(LocalDateTime.now().plusMinutes(minutes));
-        user.setBanReason(reason);
         userRepository.save(user);
 
-        refreshTokenService.deleteByUserId(userId);
+        // Invalidate tokens for security
+        refreshTokenService.deleteByUser(user);
 
         auditLogService.logAction(AuditLogAction.TIMEOUT_USER, "Timed out user ID: " + userId + " for " + minutes + " minutes. Reason: " + reason);
+        notificationService.createForUser(user, "Your account has been timed out for " + minutes + " minutes. Reason: " + reason, NotificationType.ACCOUNT_SUSPENDED, user.getId());
     }
 
     private UserResponseDTO mapToDTO(User user) {
-        String primaryRole = user.getRoles().stream()
-                .findFirst()
+        Set<String> roleNames = user.getRoles().stream()
                 .map(Role::getName)
-                .orElse("ROLE_CLIENT");
+                .collect(Collectors.toSet());
 
-        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
-        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
-                || (user.getClient() != null && user.getClient().isPremium());
-        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
-                || (user.getClient() != null && user.getClient().isVerified());
+        String primaryRole = roleNames.isEmpty() ? null : roleNames.iterator().next();
+        String name = ((user.getFirstName() != null ? user.getFirstName() : "") + " " +
+                (user.getLastName() != null ? user.getLastName() : "")).trim();
+        if (name.isEmpty()) {
+            name = user.getEmail();
+        }
 
         return UserResponseDTO.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
-                .name(user.getName())
+                .name(name)
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus())
+                .emailVerified(user.isEmailVerified())
+                .emailVerifiedAt(user.getEmailVerifiedAt())
                 .primaryRole(primaryRole)
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .isPremium(isPremium)
-                .isValidated(isValidated)
-                .isTeacher(isTeacher)
+                .roles(roleNames)
                 .bannedUntil(user.getBannedUntil())
                 .banReason(user.getBanReason())
+                .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }

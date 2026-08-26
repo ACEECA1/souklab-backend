@@ -2,9 +2,6 @@ package com.project.souklab.model;
 
 public enum AuditLogAction {
     // Role management
-    CREATE_ROLE,
-    UPDATE_ROLE,
-    DELETE_ROLE,
     ASSIGN_ROLE,
     ASSIGN_ROLE_BULK,
 

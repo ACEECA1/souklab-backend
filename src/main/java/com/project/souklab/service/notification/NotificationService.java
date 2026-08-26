@@ -115,7 +115,7 @@ public class NotificationService {
     @Transactional
     public void notifyAdmins(String message) {
         userRepository.findAll().stream()
-                .filter(user -> user.getRoles().stream().anyMatch(role -> role.getName().contains("ADMIN")))
+                .filter(user -> user.getRoles().stream().anyMatch(role -> role.getName().equals("ROLE_ADMIN")))
                 .forEach(admin -> createForUser(admin, message));
     }
 
@@ -172,7 +172,6 @@ public class NotificationService {
             throw new UnauthorizedException("Not authenticated");
         }
         return userRepository.findByEmail(email)
-                .or(() -> userRepository.findByUsername(email))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 

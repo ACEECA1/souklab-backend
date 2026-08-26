@@ -51,7 +51,7 @@ public class AuditLogService {
             auditLog.setDetails(details);
 
             if (username != null && !username.equals("anonymousUser")) {
-                userRepository.findByUsername(username).ifPresent(auditLog::setUser);
+                userRepository.findByEmail(username).ifPresent(auditLog::setUser);
             }
 
             auditLogRepository.save(auditLog);
