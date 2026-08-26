@@ -1,6 +1,6 @@
 package com.project.souklab.service.security;
 
-import com.project.souklab.util.AppException;
+import com.project.souklab.exception.AppException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import xyz.capybara.clamav.ClamavClient;

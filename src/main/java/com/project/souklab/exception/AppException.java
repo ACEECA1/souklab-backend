@@ -1,4 +1,4 @@
-package com.project.souklab.util;
+package com.project.souklab.exception;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
@@ -14,6 +14,11 @@ public class AppException extends RuntimeException {
 
     public AppException(HttpStatus status, String message) {
         super(message);
+        this.status = status;
+    }
+
+    public AppException(String message, HttpStatus status, Throwable cause) {
+        super(message, cause);
         this.status = status;
     }
 }

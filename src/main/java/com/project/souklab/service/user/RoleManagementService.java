@@ -10,7 +10,7 @@ import com.project.souklab.dto.role.RoleResponseDTO;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
 import com.project.souklab.service.audit.AuditLogService;
-import com.project.souklab.util.AppException;
+import com.project.souklab.exception.AppException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;

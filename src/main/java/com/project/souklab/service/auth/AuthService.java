@@ -9,7 +9,7 @@ import com.project.souklab.model.User;
 import com.project.souklab.security.JwtUtils;
 import com.project.souklab.service.notification.NotificationService;
 import com.project.souklab.service.security.RefreshTokenService;
-import com.project.souklab.util.AppException;
+import com.project.souklab.exception.AppException;
 import com.project.souklab.util.SecurityUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;

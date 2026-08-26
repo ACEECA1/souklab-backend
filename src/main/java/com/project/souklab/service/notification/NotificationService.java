@@ -6,7 +6,7 @@ import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.notification.NotificationResponseDTO;
 import com.project.souklab.model.Notification;
 import com.project.souklab.model.User;
-import com.project.souklab.util.AppException;
+import com.project.souklab.exception.AppException;
 import com.project.souklab.util.SecurityUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
