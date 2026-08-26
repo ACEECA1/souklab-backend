@@ -21,7 +21,7 @@ Every table representing a full domain entity includes standard auditing columns
 | Classification | Soft-Delete (`deleted_at` present) | Hard-Delete / Immutable Append-Only | Rationale |
 | :--- | :--- | :--- | :--- |
 | **Domain Entities** | `users`, `artisan_profiles`, `clients`, `formations`, `feed_posts`, `artisan_gallery_images`, `artisan_certifications`, `artisan_achievements`, `artisan_social_links`, `conversations`, `messages`, `reviews` | — | User-facing assets that users or artisans can delete or archive, while preserving referential integrity and audit trails. |
-| **Join / Link Tables & Auth Links** | — | `user_roles`, `oauth_identities`, `artisan_materials`, `artisan_techniques`, `artisan_epoques`, `conversation_participants` | Pure junction tables and third-party identity bindings. Associations and linked OAuth accounts are added/unlinked (hard-deleted) directly. |
+| **Join / Link Tables & Auth Links** | — | `user_roles`, `oauth_identities`, `verification_tokens`, `artisan_materials`, `artisan_techniques`, `artisan_epoques`, `conversation_participants` | Pure junction tables and third-party identity bindings. Associations and linked OAuth accounts are added/unlinked (hard-deleted) directly. |
 | **Financial & Ledger** | — | `payments`, `client_subscriptions`, `artisan_subscriptions`, `subscription_pricing` | Financial transaction history must remain immutable. Subscriptions transition to `CANCELLED` or `EXPIRED` status rather than being deleted. |
 | **Auditing & Moderation** | — | `audit_logs`, `payment_webhook_logs`, `artisan_validations`, `formation_reviews`, `formation_enrollments`, `reports`, `notifications` | Append-only security and administrative decision records. Must never be altered or deleted. |
 
@@ -144,6 +144,29 @@ External social provider identity mappings (Google, Facebook, Apple) linked to u
   - `uk_oauth_provider_user` (`provider`, `provider_user_id`): **Unique constraint**. Guarantees that a specific third-party account cannot be linked to more than one user account.
   - `idx_oauth_user_id` (`user_id`): Fast retrieval of all linked social accounts for a user profile.
   - `idx_oauth_email` (`email`): Lookup index supporting the auto-link-by-verified-email authentication flow.
+
+---
+
+### 2.6 `verification_tokens`
+Cryptographically hashed single-use verification and password-reset codes with attempt limits.
+
+| Column Name | SQL Type | Nullable | Default | Constraints & Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
+| `user_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `users.id` (`ON DELETE CASCADE`) |
+| `type` | `VARCHAR(50)` | `NO` | — | Enum: `EMAIL_VERIFICATION`, `PASSWORD_RESET` |
+| `code_hash` | `VARCHAR(255)` | `NO` | — | SHA-256 hex digest of the 6-digit verification code |
+| `expires_at` | `DATETIME(6)` | `NO` | — | Expiration timestamp (now + 15 minutes) |
+| `used_at` | `DATETIME(6)` | `YES` | `NULL` | Timestamp when the code was successfully verified/consumed |
+| `attempts` | `INT` | `NO` | `0` | Failed verification attempt count for lockout protection |
+| `created_at` | `DATETIME(6)` | `NO` | — | Audit creation timestamp |
+| `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
+| `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Inherited soft-delete column |
+
+- **Relationships**:
+  - `ManyToOne` with `User` (owning side: `VerificationToken`, fetch: `LAZY`, foreign key column: `user_id`).
+- **Indexes & Unique Constraints**:
+  - `idx_verification_tokens_user_type` (`user_id`, `type`, `used_at`): Composite index for fast active token lookups and invalidations.
 
 ---
 

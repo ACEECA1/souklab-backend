@@ -1,6 +1,10 @@
 package com.project.souklab.model;
 
 public enum AuditLogAction {
+    // Authentication & Security
+    EMAIL_VERIFIED,
+    PASSWORD_RESET_COMPLETED,
+
     // Role management
     ASSIGN_ROLE,
     ASSIGN_ROLE_BULK,

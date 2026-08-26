@@ -80,6 +80,40 @@ public class EmailUtil {
         }
     }
 
+    @Async("applicationTaskExecutor")
+    public void sendOAuthOnlyPasswordResetNotice(String toEmail) {
+        String subject = "Password reset request for Souklab account";
+        String htmlContent = "<p>Hello,</p>" +
+                "<p>We received a password reset request for your Souklab account.</p>" +
+                "<p>Your account is linked to Google Sign-In and does not use a separate password. " +
+                "Please continue signing in directly with Google.</p>" +
+                "<p>If you did not request this, you can safely ignore this email.</p>";
+
+        if (appProperties.getEmail().isUseSmtp()) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(toEmail);
+                message.setSubject(subject);
+                message.setText("Hello,\n\nWe received a password reset request for your Souklab account.\n\n" +
+                        "Your account is linked to Google Sign-In and does not use a separate password. " +
+                        "Please continue signing in directly with Google.\n\n" +
+                        "If you did not request this, you can safely ignore this email.");
+                mailSender.send(message);
+            } catch (Exception ex) {
+                LOGGER.error("Failed to send OAuth password reset notice email via SMTP to {}", toEmail, ex);
+            }
+            return;
+        }
+
+        try {
+            sendViaMailerSend(toEmail, subject, htmlContent);
+        } catch (RestClientException ex) {
+            LOGGER.error("Failed to send OAuth password reset notice email via MailerSend to {}", toEmail, ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while sending OAuth password reset notice email via MailerSend to {}", toEmail, ex);
+        }
+    }
+
     private void sendViaMailerSend(String recipientEmail, String yourSubjectVariable, String yourHtmlContentVariable) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + appProperties.getMailersend().getApiKey());

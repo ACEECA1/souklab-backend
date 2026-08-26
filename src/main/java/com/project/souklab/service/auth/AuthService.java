@@ -10,8 +10,11 @@ import com.project.souklab.exception.ResourceNotFoundException;
 import com.project.souklab.exception.UnauthorizedException;
 import com.project.souklab.model.*;
 import com.project.souklab.security.JwtUtils;
+import com.project.souklab.service.audit.AuditLogService;
 import com.project.souklab.service.notification.NotificationService;
 import com.project.souklab.service.security.RefreshTokenService;
+import com.project.souklab.service.security.VerificationTokenService;
+import com.project.souklab.util.EmailUtil;
 import com.project.souklab.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +46,9 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final RefreshTokenService refreshTokenService;
     private final AppProperties appProperties;
+    private final VerificationTokenService verificationTokenService;
+    private final EmailUtil emailUtil;
+    private final AuditLogService auditLogService;
 
     /**
      * Registers a new user.
@@ -57,6 +63,7 @@ public class AuthService {
             throw new ConflictException("Email is already registered: " + email);
         }
 
+        AccountStatus initialStatus = AccountStatus.ACTIVE;
         String roleInput = dto.getRole() != null ? dto.getRole().trim().toUpperCase() : "";
         if (roleInput.equals("ADMIN") || roleInput.equals("ROLE_ADMIN")) {
             throw new BadRequestException("Administrator registration is not permitted via public registration.");
@@ -68,12 +75,7 @@ public class AuthService {
         }
 
         Role assignedRole = roleRepository.findByName(roleName)
-                .orElseGet(() -> {
-                    Role newRole = new Role();
-                    newRole.setName(roleName);
-                    newRole.setDescription(roleName + " role");
-                    return roleRepository.save(newRole);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
 
         String firstName = dto.getFirstName();
         String lastName = dto.getLastName();
@@ -84,7 +86,9 @@ public class AuthService {
         }
 
         boolean isArtisan = roleName.equals("ROLE_ARTISAN");
-        AccountStatus initialStatus = isArtisan ? AccountStatus.PENDING : AccountStatus.ACTIVE;
+        if (isArtisan) {
+            initialStatus = AccountStatus.PENDING;
+        }
 
         User user = User.builder()
                 .email(email)
@@ -97,6 +101,14 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        // Email verification code generation & dispatch
+        try {
+            String rawCode = verificationTokenService.issueToken(savedUser, VerificationTokenType.EMAIL_VERIFICATION);
+            emailUtil.sendVerificationCode(savedUser.getEmail(), rawCode);
+        } catch (Exception e) {
+            log.warn("Could not issue or send verification code to {}: {}", savedUser.getEmail(), e.getMessage());
+        }
 
         if (isArtisan) {
             try {
@@ -309,12 +321,7 @@ public class AuthService {
                 }
 
                 Role role = roleRepository.findByName(roleName)
-                        .orElseGet(() -> {
-                            Role newRole = new Role();
-                            newRole.setName(roleName);
-                            newRole.setDescription(roleName + " role");
-                            return roleRepository.save(newRole);
-                        });
+                        .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
 
                 user = User.builder()
                         .email(email)
@@ -424,6 +431,90 @@ public class AuthService {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Verifies a user's email address using a submitted 6-digit verification code.
+     */
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public void verifyEmail(VerifyEmailRequestDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + dto.getEmail()));
+
+        verificationTokenService.validateAndConsume(user, VerificationTokenType.EMAIL_VERIFICATION, dto.getCode());
+
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        auditLogService.logAction(AuditLogAction.EMAIL_VERIFIED, "Email verified for user: " + user.getEmail(), user.getEmail());
+    }
+
+    /**
+     * Resends an email verification code if the user exists and is not yet verified.
+     * Always produces identical outward response behavior to prevent account enumeration.
+     */
+    @Transactional
+    public void resendVerification(ResendVerificationRequestDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (!user.isEmailVerified()) {
+                try {
+                    String rawCode = verificationTokenService.issueToken(user, VerificationTokenType.EMAIL_VERIFICATION);
+                    emailUtil.sendVerificationCode(user.getEmail(), rawCode);
+                } catch (Exception e) {
+                    log.warn("Failed to issue or send resend verification email for {}: {}", email, e.getMessage());
+                }
+            }
+        });
+    }
+
+    /**
+     * Initiates password reset flow.
+     * If user exists with password, issues reset token and emails the 6-digit code.
+     * If user exists without password (OAuth-only), emails an informational notice.
+     * Always returns generic success outward.
+     */
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequestDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getPassword() != null && !user.getPassword().isBlank()) {
+                try {
+                    String rawCode = verificationTokenService.issueToken(user, VerificationTokenType.PASSWORD_RESET);
+                    emailUtil.sendPasswordResetCode(user.getEmail(), rawCode);
+                } catch (Exception e) {
+                    log.warn("Failed to issue or send password reset code for {}: {}", email, e.getMessage());
+                }
+            } else {
+                try {
+                    emailUtil.sendOAuthOnlyPasswordResetNotice(user.getEmail());
+                } catch (Exception e) {
+                    log.warn("Failed to send OAuth password reset notice for {}: {}", email, e.getMessage());
+                }
+            }
+        });
+    }
+
+    /**
+     * Resets a user's password using the submitted 6-digit code.
+     * Invalidates all active refresh tokens for the user upon completion.
+     */
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public void resetPassword(ResetPasswordRequestDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Invalid or expired code."));
+
+        verificationTokenService.validateAndConsume(user, VerificationTokenType.PASSWORD_RESET, dto.getCode());
+
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        userRepository.save(user);
+
+        refreshTokenService.deleteByUser(user);
+
+        auditLogService.logAction(AuditLogAction.PASSWORD_RESET_COMPLETED, "Password reset completed for user: " + user.getEmail(), user.getEmail());
     }
 
     private String extractClientIp(HttpServletRequest request) {

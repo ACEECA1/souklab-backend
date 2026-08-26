@@ -12,7 +12,7 @@ import lombok.*;
 public class AuditLog extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private AuditLogAction action;
 
     @Column(length = 2000)

@@ -97,6 +97,81 @@ Rotates refresh tokens and generates a fresh access token.
 - **Access**: Public
 - **Request Body**: `{ "refreshToken": "7c9e6679-7425..." }`
 
+### `POST /api/v1/auth/verify-email`
+Verifies user email using a 6-digit verification code.
+- **Access**: Public
+- **Request Body**:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+- **Response**: `200 OK`
+```json
+{
+  "success": true,
+  "message": "Email verified successfully.",
+  "data": null
+}
+```
+
+### `POST /api/v1/auth/resend-verification`
+Resends an email verification code if the user exists and is unverified.
+- **Access**: Public
+- **Request Body**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+- **Response**: `200 OK` (Generic response to prevent user enumeration)
+```json
+{
+  "success": true,
+  "message": "If an unverified account exists for this email, a verification code has been sent.",
+  "data": null
+}
+```
+
+### `POST /api/v1/auth/forgot-password`
+Initiates password reset by emailing a 6-digit reset code (or OAuth reminder notice).
+- **Access**: Public
+- **Request Body**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+- **Response**: `200 OK` (Generic response to prevent user enumeration)
+```json
+{
+  "success": true,
+  "message": "If an account exists for this email, instructions have been sent.",
+  "data": null
+}
+```
+
+### `POST /api/v1/auth/reset-password`
+Resets password using a 6-digit reset code and invalidates existing refresh tokens.
+- **Access**: Public
+- **Request Body**:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "newPassword": "NewStrongPassword123!"
+}
+```
+- **Response**: `200 OK`
+```json
+{
+  "success": true,
+  "message": "Password reset successfully. You can now log in with your new password.",
+  "data": null
+}
+```
+
 ### `POST /api/v1/auth/complete-profile`
 Completes profile details for newly registered Artisans or Clients.
 - **Access**: Authenticated
