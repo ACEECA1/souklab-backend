@@ -34,7 +34,7 @@ public class EmailUtil {
     @Value("${app.mailersend.sender-email:}")
     private String senderEmail;
 
-    @Value("${app.mailersend.sender-name:Djezzy Talent}")
+    @Value("${app.mailersend.sender-name:Souklab}")
     private String senderName;
 
     @Async("applicationTaskExecutor")

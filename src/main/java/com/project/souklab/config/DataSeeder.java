@@ -22,6 +22,9 @@ public class DataSeeder implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin.default-password:admin123}")
+    private String adminDefaultPassword;
+
     @Override
     @Transactional
     public void run(String... args) {
@@ -48,7 +51,7 @@ public class DataSeeder implements CommandLineRunner {
 
         User admin = new User();
         admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("admin123"));
+        admin.setPassword(passwordEncoder.encode(adminDefaultPassword));
         admin.setFirstName("System");
         admin.setLastName("Administrator");
         admin.setStatus(User.UserStatus.ACTIVE);

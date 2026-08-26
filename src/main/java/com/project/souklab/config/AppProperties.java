@@ -15,9 +15,9 @@ public class AppProperties {
 
     @Data
     public static class Jwt {
-        private String secret = "defaultSecretKeyThatIsAtLeast32BytesLongForHS256Algorithm";
-        private long accessTokenExpirationMs = 3600000; 
-        private long refreshTokenExpirationMs = 86400000; 
+        private String secret;
+        private long accessTokenExpirationMs = 3600000;
+        private long refreshTokenExpirationMs = 86400000;
     }
 
     @Data

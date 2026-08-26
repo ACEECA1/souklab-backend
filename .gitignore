@@ -35,7 +35,7 @@ build/
 ### Environments ###
 .env
 .env.*
-!.example.env
+!.env.example
 
 ### Custom ###
 storage/
