@@ -4,14 +4,21 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Configuration
 @ConfigurationProperties(prefix = "app")
 @Data
 public class AppProperties {
 
     private Storage storage = new Storage();
-    private VirusScan virusScan = new VirusScan();
     private Jwt jwt = new Jwt();
+    private Cors cors = new Cors();
+    private Admin admin = new Admin();
+    private Email email = new Email();
+    private Mailersend mailersend = new Mailersend();
+    private Chargily chargily = new Chargily();
 
     @Data
     public static class Jwt {
@@ -28,9 +35,32 @@ public class AppProperties {
     }
 
     @Data
-    public static class VirusScan {
-        private boolean enabled = true;
-        private String host = "localhost";
-        private int port = 3310;
+    public static class Cors {
+        private List<String> allowedOrigins = new ArrayList<>();
+    }
+
+    @Data
+    public static class Admin {
+        private String defaultPassword;
+    }
+
+    @Data
+    public static class Email {
+        private boolean useSmtp = true;
+    }
+
+    @Data
+    public static class Mailersend {
+        private String apiKey;
+        private String senderEmail = "noreply@souklab.dz";
+        private String senderName = "Souklab";
+    }
+
+    @Data
+    public static class Chargily {
+        private String apiKey;
+        private String secretKey;
+        private String mode = "test";
+        private String webhookSecret;
     }
 }

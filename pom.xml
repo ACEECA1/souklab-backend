@@ -118,13 +118,6 @@
             <version>3.0.2</version>
         </dependency>
 
-        <!-- Antivirus Screening: ClamAV Daemon Client (Media & Upload Security) -->
-        <dependency>
-            <groupId>xyz.capybara</groupId>
-            <artifactId>clamav-client</artifactId>
-            <version>2.1.2</version>
-        </dependency>
-
         <!-- Developer Tools & Boilerplate Reduction -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

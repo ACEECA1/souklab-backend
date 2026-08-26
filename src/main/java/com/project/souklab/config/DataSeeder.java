@@ -21,9 +21,7 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-
-    @org.springframework.beans.factory.annotation.Value("${app.admin.default-password:admin123}")
-    private String adminDefaultPassword;
+    private final AppProperties appProperties;
 
     @Override
     @Transactional
@@ -49,9 +47,14 @@ public class DataSeeder implements CommandLineRunner {
     private void seedAdminUser() {
         Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
 
+        String defaultPassword = appProperties.getAdmin().getDefaultPassword();
+        if (defaultPassword == null || defaultPassword.isBlank()) {
+            throw new IllegalStateException("APP_ADMIN_DEFAULT_PASSWORD must be configured in the environment");
+        }
+
         User admin = new User();
         admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode(adminDefaultPassword));
+        admin.setPassword(passwordEncoder.encode(defaultPassword));
         admin.setFirstName("System");
         admin.setLastName("Administrator");
         admin.setStatus(User.UserStatus.ACTIVE);
