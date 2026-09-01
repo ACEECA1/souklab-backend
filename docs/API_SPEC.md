@@ -289,7 +289,21 @@ Returns complete artisan public dossier (Bio, Gallery, Certifications, Achieveme
 
 ## 9. Admin & Moderation Operations (`/api/v1/admin/**`)
 
+- `GET /api/v1/admin/users`: Paginated list of users with optional search filter.
+- `GET /api/v1/admin/users/pending`: Paginated list of pending artisan registrations.
+- `POST /api/v1/admin/users/{id}/approve`: Approve a user account (`ACTIVE`).
+- `POST /api/v1/admin/users/approve-bulk`: Bulk approve multiple user accounts.
+- `POST /api/v1/admin/users/{id}/ban`: Ban a user account with reason.
+- `POST /api/v1/admin/users/{id}/timeout`: Timeout user for specified minutes with reason.
 - `GET /api/v1/admin/stats`: KPI dashboard (total artisans, pending validations, active workshops, revenues).
 - `POST /api/v1/admin/users/{id}/validation`: Approve, reject, or suspend artisan account.
 - `POST /api/v1/admin/formations/{id}/review`: Approve or reject workshop curriculum.
 - `POST /api/v1/admin/reports/{id}/resolve`: Resolve abuse reports and execute penalty actions.
+
+---
+
+## 10. Notifications (`/api/v1/notifications/**`)
+
+- `GET /api/v1/notifications`: List all notifications for the authenticated user.
+- `PUT /api/v1/notifications/{id}/read`: Mark a specific notification as read.
+- `PUT /api/v1/notifications/read-all`: Mark all notifications for the authenticated user as read.

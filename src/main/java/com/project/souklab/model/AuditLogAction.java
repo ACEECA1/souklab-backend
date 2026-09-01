@@ -6,7 +6,7 @@ public enum AuditLogAction {
     PASSWORD_RESET_COMPLETED,
     PASSWORD_CHANGED,
 
-    // Role management
+    // Role management (Historical / archived actions — retained for existing audit log records)
     ASSIGN_ROLE,
     ASSIGN_ROLE_BULK,
 

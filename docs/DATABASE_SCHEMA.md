@@ -54,6 +54,8 @@ Core identity record for all platform actors (Admins, Artisans, and Clients).
 | `last_login_ip` | `VARCHAR(45)` | `YES` | `NULL` | IPv4 / IPv6 address of last login |
 | `banned_until` | `DATETIME(6)` | `YES` | `NULL` | Temporary suspension expiration date |
 | `ban_reason` | `VARCHAR(255)` | `YES` | `NULL` | Administrative moderation note |
+| `failed_login_attempts` | `INT` | `NO` | `0` | Consecutive failed login attempts counter |
+| `locked_until` | `DATETIME(6)` | `YES` | `NULL` | Automatic temporary lockout expiration timestamp |
 | `created_at` | `DATETIME(6)` | `NO` | — | Audit creation timestamp |
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |

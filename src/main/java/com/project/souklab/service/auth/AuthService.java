@@ -123,8 +123,9 @@ public class AuthService {
 
     /**
      * Authenticates a user by email and password, issuing access + refresh token pair.
+     * Enforces a 15-minute temporary lockout after 5 consecutive failed login attempts.
      */
-    @Transactional
+    @Transactional(noRollbackFor = {UnauthorizedException.class, BadRequestException.class})
     public JwtResponseDTO login(LoginDTO dto, HttpServletRequest request) {
         String identifier = dto.getLoginIdentifier();
         if (identifier == null || identifier.isBlank()) {
@@ -139,7 +140,17 @@ public class AuthService {
             throw new UnauthorizedException("This account was created via social login. Please sign in with Google.");
         }
 
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Too many failed login attempts. Account is temporarily locked. Please try again later.");
+        }
+
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= 5) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            }
+            userRepository.save(user);
             throw new UnauthorizedException("Invalid email or password.");
         }
 
@@ -152,6 +163,8 @@ public class AuthService {
             throw new ForbiddenException("Account registration was rejected: " + (user.getBanReason() != null ? user.getBanReason() : "Please contact support."));
         }
 
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         user.setLastLoginAt(LocalDateTime.now());
         if (request != null) {
             user.setLastLoginIp(extractClientIp(request));
