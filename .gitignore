@@ -41,3 +41,4 @@ build/
 storage/
 .postman/
 postman/.dependencies/
+.tours/
