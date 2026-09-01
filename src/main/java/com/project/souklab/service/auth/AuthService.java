@@ -3,6 +3,9 @@ package com.project.souklab.service.auth;
 import com.project.souklab.config.AppProperties;
 import com.project.souklab.dao.*;
 import com.project.souklab.dto.auth.*;
+import com.project.souklab.dto.profile.ArtisanProfileResponseDTO;
+import com.project.souklab.dto.profile.ClientProfileResponseDTO;
+import com.project.souklab.dto.profile.ProfileResponse;
 import com.project.souklab.exception.BadRequestException;
 import com.project.souklab.exception.ConflictException;
 import com.project.souklab.exception.ForbiddenException;
@@ -57,7 +60,7 @@ public class AuthService {
      * Public registration strictly prohibits ADMIN accounts.
      */
     @Transactional
-    public UserResponseDTO registerUser(UserRegistrationDTO dto) {
+    public ProfileResponse registerUser(UserRegistrationDTO dto) {
         String email = dto.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("Email is already registered: " + email);
@@ -118,7 +121,7 @@ public class AuthService {
             }
         }
 
-        return mapToDTO(savedUser);
+        return mapToProfileResponse(savedUser);
     }
 
     /**
@@ -192,7 +195,7 @@ public class AuthService {
                 .refreshToken(newToken.getToken())
                 .tokenType("Bearer")
                 .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
-                .user(mapToSummaryDTO(user))
+                .user(mapToLoginSummary(user))
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
                 .build();
     }
@@ -215,7 +218,7 @@ public class AuthService {
      * Returns the currently authenticated user's profile.
      */
     @Transactional(readOnly = true)
-    public UserResponseDTO getCurrentUser() {
+    public ProfileResponse getCurrentUser() {
         String email = SecurityUtils.getCurrentUsername();
         if (email == null) {
             throw new UnauthorizedException("Not authenticated.");
@@ -224,14 +227,14 @@ public class AuthService {
         User user = userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
-        return mapToDTO(user);
+        return mapToProfileResponse(user);
     }
 
     /**
      * Completes profile creation for Artisan or Client.
      */
     @Transactional
-    public UserResponseDTO completeProfile(CompleteProfileRequestDTO dto) {
+    public ProfileResponse completeProfile(CompleteProfileRequestDTO dto) {
         String email = SecurityUtils.getCurrentUsername();
         if (email == null) {
             throw new UnauthorizedException("Not authenticated.");
@@ -255,7 +258,7 @@ public class AuthService {
             if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
             if (dto.getWebsite() != null) profile.setWebsite(dto.getWebsite());
             if (dto.getSubCategoryId() != null) profile.setSubCategoryId(dto.getSubCategoryId());
-            if (dto.getIsTeacher() != null) profile.setTeacher(dto.getIsTeacher());
+            // NOTE: isTeacher is NOT settable here — controlled exclusively by ArtisanFormateurService.
 
             artisanProfileRepository.save(profile);
             user.setArtisanProfile(profile);
@@ -272,7 +275,7 @@ public class AuthService {
             user.setClient(client);
         }
 
-        return mapToDTO(user);
+        return mapToProfileResponse(user);
     }
 
     /**
@@ -378,11 +381,86 @@ public class AuthService {
                 .refreshToken(refreshToken.getToken())
                 .tokenType("Bearer")
                 .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
-                .user(mapToSummaryDTO(user))
+                .user(mapToLoginSummary(user))
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
                 .build();
     }
 
+    /**
+     * Produces a role-specific login user summary embedded in the JWT response.
+     * Clients receive ClientProfileResponseDTO; Artisans receive ArtisanProfileResponseDTO.
+     * This replaces the old shared UserSummaryDTO that leaked artisan-specific fields to clients.
+     */
+    public ProfileResponse mapToLoginSummary(User user) {
+        return mapToProfileResponse(user);
+    }
+
+    /**
+     * Dispatches to the correct role-specific profile DTO.
+     * Clients → ClientProfileResponseDTO (no artisan fields)
+     * Artisans → ArtisanProfileResponseDTO (full artisan fields)
+     * Admins/unknown → ArtisanProfileResponseDTO as fallback (admin tooling uses UserResponseDTO separately)
+     */
+    public ProfileResponse mapToProfileResponse(User user) {
+        boolean isArtisan = user.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
+
+        Set<String> roleNames = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        if (isArtisan) {
+            ArtisanProfile profile = user.getArtisanProfile();
+            return ArtisanProfileResponseDTO.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .name(user.getName())
+                    .phone(user.getPhone())
+                    .avatarUrl(user.getAvatarUrl())
+                    .accountStatus(user.getStatus())
+                    .roles(roleNames)
+                    .emailVerified(user.isEmailVerified())
+                    .emailVerifiedAt(user.getEmailVerifiedAt())
+                    .createdAt(user.getCreatedAt())
+                    .updatedAt(user.getUpdatedAt())
+                    .bio(profile != null ? profile.getBio() : null)
+                    .regionId(profile != null ? profile.getRegionId() : null)
+                    .city(profile != null ? profile.getCity() : null)
+                    .address(profile != null ? profile.getAddress() : null)
+                    .website(profile != null ? profile.getWebsite() : null)
+                    .subCategoryId(profile != null ? profile.getSubCategoryId() : null)
+                    .teacher(profile != null && profile.isTeacher())
+                    .verified(profile != null && profile.isVerified())
+                    .premium(profile != null && profile.isPremium())
+                    .rating(profile != null ? profile.getRating() : 0.0)
+                    .reviewsCount(profile != null ? profile.getReviewsCount() : 0)
+                    .build();
+        }
+
+        // Default: client path
+        return ClientProfileResponseDTO.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .name(user.getName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .accountStatus(user.getStatus())
+                .roles(roleNames)
+                .emailVerified(user.isEmailVerified())
+                .emailVerifiedAt(user.getEmailVerifiedAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * Kept for admin UserManagementService compatibility — returns the shared UserResponseDTO
+     * which is appropriate for admin views where all fields are intentionally visible.
+     */
     public UserSummaryDTO mapToSummaryDTO(User user) {
         String primaryRole = user.getRoles().stream()
                 .findFirst()
@@ -410,6 +488,7 @@ public class AuthService {
                 .build();
     }
 
+    /** @deprecated Use mapToProfileResponse(User) for auth endpoints. Kept for admin services. */
     public UserResponseDTO mapToDTO(User user) {
         String primaryRole = user.getRoles().stream()
                 .findFirst()

@@ -19,6 +19,9 @@ public class CompleteProfileRequestDTO {
     private String city;
 
     // Artisan-specific fields
+    // NOTE: isTeacher is intentionally absent — it is controlled exclusively by the
+    // Formateur request/approve/grant/revoke flow. Any "isTeacher" key in the request
+    // body is silently ignored by Jackson (default unknown-field behavior).
     private String bio;
     private String address;
     private String website;
@@ -26,7 +29,6 @@ public class CompleteProfileRequestDTO {
     private List<String> materialIds;
     private List<String> epoqueIds;
     private List<String> techniqueIds;
-    private Boolean isTeacher;
 
     // Client-specific fields
     private String clientType;

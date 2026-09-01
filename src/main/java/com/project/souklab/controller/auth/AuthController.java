@@ -2,6 +2,7 @@ package com.project.souklab.controller.auth;
 
 import com.project.souklab.dto.auth.*;
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.dto.profile.ProfileResponse;
 import com.project.souklab.model.AccountStatus;
 import com.project.souklab.service.auth.AuthService;
 import com.project.souklab.util.SecurityUtils;
@@ -25,9 +26,11 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponseDTO>> register(@Valid @RequestBody UserRegistrationDTO registrationDTO) {
-        UserResponseDTO response = authService.registerUser(registrationDTO);
-        String message = (response.getStatus() == AccountStatus.PENDING)
+    public ResponseEntity<ApiResponse<ProfileResponse>> register(@Valid @RequestBody UserRegistrationDTO registrationDTO) {
+        ProfileResponse response = authService.registerUser(registrationDTO);
+        // Determine status message based on the user's account status
+        boolean isPending = response.getAccountStatus() == AccountStatus.PENDING;
+        String message = isPending
                 ? "Registration successful. Your artisan account has been created and is pending administrator verification."
                 : "Registration successful. Welcome to Souklab!";
 
@@ -88,13 +91,13 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponseDTO>> getCurrentUser() {
+    public ResponseEntity<ApiResponse<ProfileResponse>> getCurrentUser() {
         return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser()));
     }
 
     @PostMapping("/complete-profile")
-    public ResponseEntity<ApiResponse<UserResponseDTO>> completeProfile(@Valid @RequestBody CompleteProfileRequestDTO request) {
-        UserResponseDTO response = authService.completeProfile(request);
+    public ResponseEntity<ApiResponse<ProfileResponse>> completeProfile(@Valid @RequestBody CompleteProfileRequestDTO request) {
+        ProfileResponse response = authService.completeProfile(request);
         return ResponseEntity.ok(ApiResponse.success(response, "Profile completed successfully."));
     }
 

@@ -1,5 +1,6 @@
 package com.project.souklab.dto.auth;
 
+import com.project.souklab.dto.profile.ProfileResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,6 +18,7 @@ public class JwtResponseDTO {
     @Builder.Default
     private String tokenType = "Bearer";
     private long expiresIn;
-    private UserSummaryDTO user;
+    /** Role-specific profile object: ClientProfileResponseDTO for clients, ArtisanProfileResponseDTO for artisans. */
+    private ProfileResponse user;
     private List<String> roles;
 }
