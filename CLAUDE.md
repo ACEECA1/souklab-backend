@@ -15,7 +15,7 @@ Production-grade Spring Boot 3/4 backend powering the **Souklab** Algerian Artis
 ## 📁 Package Architecture (`com.project.souklab` or `com.souklab`)
 ```
 src/main/java/com/project/souklab/
-├── config/              # SecurityConfig, WebSocketConfig, RabbitMQConfig, AsyncConfig, AppProperties
+├── config/              # SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties
 ├── security/            # JwtAuthenticationFilter, JwtUtils, RateLimitFilter, CustomUserDetails
 ├── controller/          # REST endpoints organized by domain
 │   ├── auth/            # Authentication & Account completion (/api/v1/auth/**)

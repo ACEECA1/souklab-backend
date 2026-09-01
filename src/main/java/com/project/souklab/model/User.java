@@ -61,7 +61,7 @@ public class User extends BaseEntity {
     @Column(name = "banned_until")
     private LocalDateTime bannedUntil;
 
-    @Column(name = "ban_reason", length = 255)
+    @Column(name = "ban_reason", columnDefinition = "TEXT")
     private String banReason;
 
     @Column(name = "failed_login_attempts", nullable = false)

@@ -103,10 +103,14 @@
             <version>8.2.2.Final</version>
         </dependency>
 
-        <!-- Realtime Communication: Spring WebSocket (STOMP Broker) -->
+        <!-- Realtime Communication: Spring WebSocket & STOMP Broker Relay (RabbitMQ) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty</artifactId>
         </dependency>
 
         <!-- Email: Spring Boot Starter Mail (Verification & Password Reset) -->

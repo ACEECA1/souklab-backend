@@ -51,7 +51,6 @@ com.project.souklab
 ├── config/                  # Framework & integration configs
 │   ├── SecurityConfig.java
 │   ├── WebSocketConfig.java
-│   ├── RabbitMQConfig.java
 │   ├── AsyncConfig.java
 │   ├── AppProperties.java
 │   ├── ChargilyProperties.java

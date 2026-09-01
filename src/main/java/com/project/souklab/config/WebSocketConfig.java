@@ -14,6 +14,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+    private final AppProperties appProperties;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -22,7 +23,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue");
+        AppProperties.Relay relay = appProperties.getRelay();
+        registry.enableStompBrokerRelay("/topic", "/queue")
+                .setRelayHost(relay.getHost())
+                .setRelayPort(relay.getPort())
+                .setClientLogin(relay.getClientLogin())
+                .setClientPasscode(relay.getClientPasscode())
+                .setSystemLogin(relay.getSystemLogin())
+                .setSystemPasscode(relay.getSystemPasscode())
+                .setUserDestinationBroadcast("/topic/unresolved-user-destination")
+                .setUserRegistryBroadcast("/topic/simp-user-registry");
+
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }

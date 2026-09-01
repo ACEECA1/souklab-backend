@@ -11,6 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 public class Notification extends BaseEntity {
 
+    @Column(columnDefinition = "TEXT")
     private String message;
     private boolean isRead = false;
 

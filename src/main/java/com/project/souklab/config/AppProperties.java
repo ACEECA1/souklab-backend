@@ -20,6 +20,17 @@ public class AppProperties {
     private Mailersend mailersend = new Mailersend();
     private Chargily chargily = new Chargily();
     private OAuth oauth = new OAuth();
+    private Relay relay = new Relay();
+
+    @Data
+    public static class Relay {
+        private String host;
+        private int port;
+        private String clientLogin;
+        private String clientPasscode;
+        private String systemLogin;
+        private String systemPasscode;
+    }
 
     @Data
     public static class Jwt {

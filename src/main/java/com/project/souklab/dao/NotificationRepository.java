@@ -3,15 +3,28 @@ package com.project.souklab.dao;
 import com.project.souklab.model.Notification;
 import com.project.souklab.model.NotificationType;
 import com.project.souklab.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, String> {
-    List<Notification> findByUserOrderByCreatedAtDesc(User user);
-    Optional<Notification> findFirstByUserAndTypeAndTargetIdOrderByCreatedAtDesc(User user, NotificationType type, String targetId);
-    Optional<Notification> findByIdAndUser(String id, User user);
+    
+    Page<Notification> findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(User user, Pageable pageable);
+    
+    Optional<Notification> findFirstByUserAndTypeAndTargetIdAndDeletedAtIsNullOrderByCreatedAtDesc(User user, NotificationType type, String targetId);
+    
+    Optional<Notification> findByIdAndUserAndDeletedAtIsNull(String id, User user);
+    
+    long countByUserAndIsReadFalseAndDeletedAtIsNull(User user);
+
+    @Modifying
+    @Query("UPDATE Notification n SET n.isRead = true, n.updatedAt = CURRENT_TIMESTAMP WHERE n.user = :user AND n.isRead = false AND n.deletedAt IS NULL")
+    int markAllAsReadForUser(@Param("user") User user);
 }
