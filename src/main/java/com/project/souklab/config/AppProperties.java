@@ -53,6 +53,7 @@ public class AppProperties {
 
     @Data
     public static class Admin {
+        private String defaultEmail;
         private String defaultPassword;
     }
 

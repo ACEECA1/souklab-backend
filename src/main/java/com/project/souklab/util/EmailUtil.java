@@ -144,6 +144,116 @@ public class EmailUtil {
         }
     }
 
+    @Async("applicationTaskExecutor")
+    public void sendFormateurRequestSubmittedNoticeToAdmin(String adminEmail, String artisanEmail, String motivation) {
+        String subject = "New Formateur Request Submitted";
+        String motivationText = (motivation != null && !motivation.isBlank()) ? motivation : "No motivation message provided.";
+        String htmlContent = "<p>Hello Admin,</p>" +
+                "<p>Artisan <strong>" + artisanEmail + "</strong> has submitted a request to become a Formateur.</p>" +
+                "<p><strong>Motivation:</strong></p>" +
+                "<blockquote>" + motivationText + "</blockquote>" +
+                "<p>Please review the request in the administrator dashboard.</p>";
+        String textContent = "Hello Admin,\n\nArtisan " + artisanEmail + " has submitted a request to become a Formateur.\n\n" +
+                "Motivation:\n" + motivationText + "\n\nPlease review the request in the administrator dashboard.";
+        sendEmail(adminEmail, subject, textContent, htmlContent);
+    }
+
+    @Async("applicationTaskExecutor")
+    public void sendFormateurApprovedEmail(String toEmail, String adminNote) {
+        String subject = "Artisan Formateur Status Approved";
+        String htmlContent = "<p>Congratulations!</p>" +
+                "<p>Your request to become an official Formateur on Souklab has been approved.</p>" +
+                "<p><strong>Administrator Note:</strong></p>" +
+                "<blockquote>" + adminNote + "</blockquote>" +
+                "<p>You may now create and publish masterclasses and workshops on the platform.</p>";
+        String textContent = "Congratulations!\n\nYour request to become an official Formateur on Souklab has been approved.\n\n" +
+                "Administrator Note:\n" + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
+        sendEmail(toEmail, subject, textContent, htmlContent);
+    }
+
+    @Async("applicationTaskExecutor")
+    public void sendFormateurGrantedEmail(String toEmail, String adminNote) {
+        String subject = "Artisan Formateur Status Granted";
+        String htmlContent = "<p>Hello,</p>" +
+                "<p>You have been granted official Formateur status on Souklab by an administrator.</p>" +
+                "<p><strong>Administrator Note:</strong></p>" +
+                "<blockquote>" + adminNote + "</blockquote>" +
+                "<p>You may now create and publish masterclasses and workshops on the platform.</p>";
+        String textContent = "Hello,\n\nYou have been granted official Formateur status on Souklab by an administrator.\n\n" +
+                "Administrator Note:\n" + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
+        sendEmail(toEmail, subject, textContent, htmlContent);
+    }
+
+    @Async("applicationTaskExecutor")
+    public void sendFormateurRejectedEmail(String toEmail, String adminNote, java.time.LocalDateTime cooldownUntil, boolean canReapply) {
+        String subject = "Artisan Formateur Request Update";
+        String reapplyMessage = canReapply
+                ? (cooldownUntil != null ? "You may reapply after " + cooldownUntil + "." : "You may reapply at any time.")
+                : "You are permanently blocked from submitting new Formateur requests.";
+        String htmlContent = "<p>Hello,</p>" +
+                "<p>Your request to become a Formateur on Souklab was not approved at this time.</p>" +
+                "<p><strong>Administrator Note:</strong></p>" +
+                "<blockquote>" + adminNote + "</blockquote>" +
+                "<p>" + reapplyMessage + "</p>";
+        String textContent = "Hello,\n\nYour request to become a Formateur on Souklab was not approved at this time.\n\n" +
+                "Administrator Note:\n" + adminNote + "\n\n" + reapplyMessage;
+        sendEmail(toEmail, subject, textContent, htmlContent);
+    }
+
+    @Async("applicationTaskExecutor")
+    public void sendFormateurRevokedEmail(String toEmail, String reason) {
+        String subject = "Artisan Formateur Status Revoked";
+        String htmlContent = "<p>Hello,</p>" +
+                "<p>Your Formateur status on Souklab has been revoked by an administrator.</p>" +
+                "<p><strong>Reason:</strong></p>" +
+                "<blockquote>" + reason + "</blockquote>" +
+                "<p>You will no longer be able to create new formations. Existing formations remain unaffected.</p>";
+        String textContent = "Hello,\n\nYour Formateur status on Souklab has been revoked by an administrator.\n\n" +
+                "Reason:\n" + reason + "\n\nYou will no longer be able to create new formations. Existing formations remain unaffected.";
+        sendEmail(toEmail, subject, textContent, htmlContent);
+    }
+
+    @Async("applicationTaskExecutor")
+    public void sendAdminWelcomeEmail(String toEmail, String initialPassword) {
+        String subject = "Welcome to Souklab - Administrator Account Initialized";
+        String htmlContent = "<p>Hello Administrator,</p>" +
+                "<p>Your Souklab system administrator account has been successfully initialized on first boot.</p>" +
+                "<p><strong>Login Email:</strong> " + toEmail + "<br/>" +
+                "<strong>Initial Password:</strong> " + initialPassword + "</p>" +
+                "<p>For security, please log in and immediately change your password via the <code>/api/v1/auth/change-password</code> endpoint.</p>" +
+                "<p>Best regards,<br/>Souklab Security Team</p>";
+        String textContent = "Hello Administrator,\n\n" +
+                "Your Souklab system administrator account has been successfully initialized on first boot.\n\n" +
+                "Login Email: " + toEmail + "\n" +
+                "Initial Password: " + initialPassword + "\n\n" +
+                "For security, please log in and immediately change your password via the /api/v1/auth/change-password endpoint.\n\n" +
+                "Best regards,\nSouklab Security Team";
+        sendEmail(toEmail, subject, textContent, htmlContent);
+    }
+
+    private void sendEmail(String toEmail, String subject, String textContent, String htmlContent) {
+        if (appProperties.getEmail().isUseSmtp()) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(toEmail);
+                message.setSubject(subject);
+                message.setText(textContent);
+                mailSender.send(message);
+            } catch (Exception ex) {
+                LOGGER.error("Failed to send email via SMTP to {}", toEmail, ex);
+            }
+            return;
+        }
+
+        try {
+            sendViaMailerSend(toEmail, subject, htmlContent);
+        } catch (RestClientException ex) {
+            LOGGER.error("Failed to send email via MailerSend to {}", toEmail, ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while sending email via MailerSend to {}", toEmail, ex);
+        }
+    }
+
     private void sendViaMailerSend(String recipientEmail, String yourSubjectVariable, String yourHtmlContentVariable) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + appProperties.getMailersend().getApiKey());

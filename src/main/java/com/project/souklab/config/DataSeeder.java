@@ -5,7 +5,9 @@ import com.project.souklab.dao.UserRepository;
 import com.project.souklab.model.AccountStatus;
 import com.project.souklab.model.Role;
 import com.project.souklab.model.User;
+import com.project.souklab.util.EmailUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -16,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -24,14 +27,13 @@ public class DataSeeder implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
+    private final EmailUtil emailUtil;
 
     @Override
     @Transactional
     public void run(String... args) {
         seedRoles();
-        if (userRepository.count() == 0) {
-            seedAdminUser();
-        }
+        seedAdminUser();
     }
 
     private void seedRoles() {
@@ -47,6 +49,16 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedAdminUser() {
+        String defaultEmail = appProperties.getAdmin().getDefaultEmail();
+        if (defaultEmail == null || defaultEmail.isBlank()) {
+            throw new IllegalStateException("APP_ADMIN_DEFAULT_EMAIL must be configured in the environment");
+        }
+        String normalizedEmail = defaultEmail.trim().toLowerCase();
+
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            return;
+        }
+
         Role adminRole = roleRepository.findByName("ROLE_ADMIN")
                 .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN role not found. Seed roles first."));
 
@@ -56,7 +68,7 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         User admin = User.builder()
-                .email("admin@souklab.dz")
+                .email(normalizedEmail)
                 .password(passwordEncoder.encode(defaultPassword))
                 .firstName("System")
                 .lastName("Administrator")
@@ -67,5 +79,11 @@ public class DataSeeder implements CommandLineRunner {
                 .build();
 
         userRepository.save(admin);
+
+        try {
+            emailUtil.sendAdminWelcomeEmail(normalizedEmail, defaultPassword);
+        } catch (Exception e) {
+            log.error("Failed to send first-boot administrator welcome email to {}", normalizedEmail, e);
+        }
     }
 }
