@@ -1,14 +1,15 @@
 package com.project.souklab.security;
 
-import tools.jackson.databind.ObjectMapper;
 import com.project.souklab.dto.auth.JwtResponseDTO;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.service.auth.AuthService;
+import com.project.souklab.util.ServletResponseUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -23,8 +24,9 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final @org.springframework.context.annotation.Lazy AuthService authService;
-    private final ObjectMapper objectMapper;
+    @Lazy
+    private final AuthService authService;
+    private final ServletResponseUtil servletResponseUtil;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -37,13 +39,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         clearIntentCookie(response);
 
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.setStatus(HttpServletResponse.SC_OK);
-
         ApiResponse<JwtResponseDTO> apiResponse = ApiResponse.success(jwtResponse, "Google OAuth authentication successful.");
-        response.getWriter().write(objectMapper.writeValueAsString(apiResponse));
-        response.getWriter().flush();
+        servletResponseUtil.writeResponse(response, HttpServletResponse.SC_OK, apiResponse);
     }
 
     private String extractIntentRole(HttpServletRequest request) {

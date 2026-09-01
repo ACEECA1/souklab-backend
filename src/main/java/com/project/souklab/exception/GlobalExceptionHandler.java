@@ -1,6 +1,7 @@
 package com.project.souklab.exception;
 
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.util.SecurityUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -20,21 +21,80 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
     /**
-     * Handles all custom application exceptions (and subtypes like ResourceNotFoundException,
-     * BadRequestException, UnauthorizedException, ForbiddenException, ConflictException).
+     * Handles all custom application exceptions (AppException and subclasses like
+     * ResourceNotFoundException, ConflictException, ForbiddenException, UnauthorizedException, BadRequestException).
      */
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
-        log.warn("AppException [{}]: {}", ex.getStatus(), ex.getMessage());
+        log.warn("AppException [{}]: {}", ex.getErrorCode(), ex.getMessage());
         return ResponseEntity.status(ex.getStatus())
-                .body(ApiResponse.error(ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    /**
+     * Handles Jakarta Bean Validation errors on @Valid request bodies (422 Unprocessable Entity).
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
+            fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage() != null ? error.getDefaultMessage() : "is invalid");
+        }
+        log.debug("MethodArgumentNotValidException: {}", fieldErrors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.validationError(fieldErrors));
+    }
+
+    /**
+     * Handles constraint violation errors on method parameters (422 Unprocessable Entity).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (ConstraintViolation<?> violation : ex.getConstraintViolations()) {
+            fieldErrors.putIfAbsent(violation.getPropertyPath().toString(), violation.getMessage());
+        }
+        log.debug("ConstraintViolationException: {}", fieldErrors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.validationError(fieldErrors));
+    }
+
+    /**
+     * Handles malformed or unparseable JSON payloads (400 Bad Request).
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Malformed or unreadable request body"));
+    }
+
+    /**
+     * Handles missing static/controller resources and unmatched routes (404 Not Found).
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.debug("NoResourceFoundException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("The requested resource was not found"));
+    }
+
+    /**
+     * Handles unsupported HTTP methods (405 Method Not Allowed).
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
+        log.debug("HttpRequestMethodNotSupportedException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(ApiResponse.error("HTTP method not allowed"));
     }
 
     /**
@@ -42,9 +102,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex) {
-        log.warn("AccessDeniedException: {}", ex.getMessage());
+        String username = SecurityUtils.getCurrentUsername();
+        log.warn("AccessDeniedException for user [{}]: {}", username != null ? username : "anonymous", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("Access denied: You do not have permission to perform this action."));
+                .body(ApiResponse.error("Access denied"));
     }
 
     /**
@@ -58,59 +119,17 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles Jakarta Bean Validation errors on @Valid request bodies (400 Bad Request).
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
-        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + (error.getDefaultMessage() != null ? error.getDefaultMessage() : "is invalid"))
-                .collect(Collectors.joining("; "));
-
-        if (errorMessage.isBlank()) {
-            errorMessage = "Validation failed for the request payload.";
-        }
-
-        log.warn("MethodArgumentNotValidException: {}", errorMessage);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(errorMessage));
-    }
-
-    /**
-     * Handles constraint violation errors on method parameters (400 Bad Request).
-     */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
-        String errorMessage = ex.getConstraintViolations().stream()
-                .map(ConstraintViolation::getMessage)
-                .collect(Collectors.joining("; "));
-
-        log.warn("ConstraintViolationException: {}", errorMessage);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(errorMessage));
-    }
-
-    /**
-     * Handles malformed or unparseable JSON payloads (400 Bad Request).
-     */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
-        log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Malformed JSON request or invalid data format provided."));
-    }
-
-    /**
-     * Handles missing required query parameters (400 Bad Request).
+     * Handles missing required request parameters (400 Bad Request).
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMissingParams(MissingServletRequestParameterException ex) {
-        log.warn("Missing parameter: {}", ex.getParameterName());
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        log.warn("MissingServletRequestParameterException: {}", ex.getParameterName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Missing required request parameter: " + ex.getParameterName()));
     }
 
     /**
-     * Handles type conversion failures on path variables / query params (400 Bad Request).
+     * Handles type mismatch on path variables / query params (400 Bad Request).
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
@@ -120,36 +139,6 @@ public class GlobalExceptionHandler {
         log.warn("MethodArgumentTypeMismatchException: {}", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message));
-    }
-
-    /**
-     * Handles illegal argument exceptions (400 Bad Request).
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.warn("IllegalArgumentException: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
-
-    /**
-     * Handles missing static/controller resources (404 Not Found).
-     */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
-        log.warn("NoResourceFoundException: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Resource not found: /" + ex.getResourcePath()));
-    }
-
-    /**
-     * Handles unsupported HTTP methods (405 Method Not Allowed).
-     */
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
-        log.warn("HttpRequestMethodNotSupportedException: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(ApiResponse.error(String.format("HTTP method '%s' is not supported for this endpoint.", ex.getMethod())));
     }
 
     /**
@@ -170,6 +159,16 @@ public class GlobalExceptionHandler {
         log.warn("MaxUploadSizeExceededException: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(ApiResponse.error("Maximum upload size exceeded."));
+    }
+
+    /**
+     * Handles illegal argument exceptions (400 Bad Request).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("IllegalArgumentException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
     }
 
     /**

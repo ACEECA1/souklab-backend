@@ -10,6 +10,7 @@ All endpoints are versioned with the `/api/v1` prefix. Standard response envelop
 ```json
 {
   "success": true,
+  "code": 200,
   "message": "Operation completed successfully",
   "data": { ... }
 }
@@ -19,24 +20,52 @@ All endpoints are versioned with the `/api/v1` prefix. Standard response envelop
 ```json
 {
   "success": true,
+  "code": 200,
   "message": "Data retrieved successfully",
   "data": {
     "content": [ ... ],
-    "page": 0,
-    "size": 12,
+    "pageNumber": 0,
+    "pageSize": 20,
     "totalElements": 85,
-    "totalPages": 8,
-    "isFirst": true,
-    "isLast": false
+    "totalPages": 5,
+    "last": false
   }
 }
 ```
 
-### Error Response Format
+### Error Response Formats
+
+#### Business Exception Error (`AppException` subclasses)
 ```json
 {
   "success": false,
-  "message": "Detailed error message or validation summary",
+  "code": 404,
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "message": "User not found with id: 123",
+  "data": null
+}
+```
+
+#### Field Validation Error (`422 Unprocessable Entity`)
+```json
+{
+  "success": false,
+  "code": 422,
+  "message": "Validation failed",
+  "data": null,
+  "errors": {
+    "email": "Email is required",
+    "password": "Password must be at least 8 characters long"
+  }
+}
+```
+
+#### Standard / System Error (`400`, `401`, `403`, `405`, `500`)
+```json
+{
+  "success": false,
+  "code": 400,
+  "message": "Malformed or unreadable request body",
   "data": null
 }
 ```
@@ -304,6 +333,8 @@ Returns complete artisan public dossier (Bio, Gallery, Certifications, Achieveme
 
 ## 10. Notifications (`/api/v1/notifications/**`)
 
-- `GET /api/v1/notifications`: List all notifications for the authenticated user.
+- `GET /api/v1/notifications`: Paginated list of notifications for the authenticated user (`?page=0&size=20`).
+- `GET /api/v1/notifications/unread-count`: Count of unread, non-deleted notifications.
 - `PUT /api/v1/notifications/{id}/read`: Mark a specific notification as read.
 - `PUT /api/v1/notifications/read-all`: Mark all notifications for the authenticated user as read.
+- `DELETE /api/v1/notifications/{id}`: Soft-delete a notification for the authenticated user.

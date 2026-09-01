@@ -5,10 +5,10 @@ import org.springframework.http.HttpStatus;
 public class UnauthorizedException extends AppException {
 
     public UnauthorizedException(String message) {
-        super(message, HttpStatus.UNAUTHORIZED);
+        super(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", message);
     }
 
     public UnauthorizedException(String message, Throwable cause) {
-        super(message, HttpStatus.UNAUTHORIZED, cause);
+        super(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", message, cause);
     }
 }

@@ -1,8 +1,10 @@
 package com.project.souklab.config;
 
+import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
 import com.project.souklab.security.RateLimitFilter;
+import com.project.souklab.util.ServletResponseUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -36,6 +38,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
+    private final ServletResponseUtil servletResponseUtil;
 
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration() {
@@ -77,6 +80,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/oauth/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/error",
                                 "/ws/**"
                         ).permitAll()
@@ -87,9 +93,11 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"success\":false,\"message\":\"Unauthorized: " + authException.getMessage() + "\"}");
+                            servletResponseUtil.writeResponse(
+                                    response,
+                                    HttpServletResponse.SC_UNAUTHORIZED,
+                                    ApiResponse.error("Unauthorized: " + authException.getMessage())
+                            );
                         })
                 );
 

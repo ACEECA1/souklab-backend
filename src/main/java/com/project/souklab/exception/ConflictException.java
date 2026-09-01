@@ -5,10 +5,10 @@ import org.springframework.http.HttpStatus;
 public class ConflictException extends AppException {
 
     public ConflictException(String message) {
-        super(message, HttpStatus.CONFLICT);
+        super(HttpStatus.CONFLICT, "CONFLICT", message);
     }
 
     public ConflictException(String message, Throwable cause) {
-        super(message, HttpStatus.CONFLICT, cause);
+        super(HttpStatus.CONFLICT, "CONFLICT", message, cause);
     }
 }
