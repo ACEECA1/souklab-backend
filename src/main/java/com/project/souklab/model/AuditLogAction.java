@@ -4,6 +4,7 @@ public enum AuditLogAction {
     // Authentication & Security
     EMAIL_VERIFIED,
     PASSWORD_RESET_COMPLETED,
+    PASSWORD_CHANGED,
 
     // Role management
     ASSIGN_ROLE,

@@ -114,6 +114,36 @@ public class EmailUtil {
         }
     }
 
+    @Async("applicationTaskExecutor")
+    public void sendPasswordChangedNotice(String toEmail) {
+        String subject = "Your Souklab password was changed";
+        String htmlContent = "<p>Hello,</p>" +
+                "<p>Your Souklab account password was successfully changed.</p>" +
+                "<p>If you did not make this change, please contact support immediately.</p>";
+
+        if (appProperties.getEmail().isUseSmtp()) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(toEmail);
+                message.setSubject(subject);
+                message.setText("Hello,\n\nYour Souklab account password was successfully changed.\n\n" +
+                        "If you did not make this change, please contact support immediately.");
+                mailSender.send(message);
+            } catch (Exception ex) {
+                LOGGER.error("Failed to send password changed notice email via SMTP to {}", toEmail, ex);
+            }
+            return;
+        }
+
+        try {
+            sendViaMailerSend(toEmail, subject, htmlContent);
+        } catch (RestClientException ex) {
+            LOGGER.error("Failed to send password changed notice email via MailerSend to {}", toEmail, ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while sending password changed notice email via MailerSend to {}", toEmail, ex);
+        }
+    }
+
     private void sendViaMailerSend(String recipientEmail, String yourSubjectVariable, String yourHtmlContentVariable) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + appProperties.getMailersend().getApiKey());

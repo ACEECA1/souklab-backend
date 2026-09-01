@@ -172,6 +172,25 @@ Resets password using a 6-digit reset code and invalidates existing refresh toke
 }
 ```
 
+### `POST /api/v1/auth/change-password`
+Changes the authenticated user's password and invalidates active refresh tokens.
+- **Access**: Authenticated
+- **Request Body**:
+```json
+{
+  "oldPassword": "CurrentPassword123!",
+  "newPassword": "NewStrongPassword456!"
+}
+```
+- **Response**: `200 OK`
+```json
+{
+  "success": true,
+  "message": "Password changed successfully.",
+  "data": null
+}
+```
+
 ### `POST /api/v1/auth/complete-profile`
 Completes profile details for newly registered Artisans or Clients.
 - **Access**: Authenticated

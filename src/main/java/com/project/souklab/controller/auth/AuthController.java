@@ -81,6 +81,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully. You can now log in with your new password."));
     }
 
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequestDTO request) {
+        authService.changePassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully."));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponseDTO>> getCurrentUser() {
         return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser()));

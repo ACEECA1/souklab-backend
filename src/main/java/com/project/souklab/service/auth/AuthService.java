@@ -517,6 +517,53 @@ public class AuthService {
         auditLogService.logAction(AuditLogAction.PASSWORD_RESET_COMPLETED, "Password reset completed for user: " + user.getEmail(), user.getEmail());
     }
 
+    /**
+     * Changes an authenticated user's password.
+     * 1. Resolves current user from SecurityContext.
+     * 2. Rejects OAuth-only users (no password to change).
+     * 3. Verifies oldPassword matches current password.
+     * 4. Validates newPassword is not identical to oldPassword.
+     * 5. Encodes and saves new password.
+     * 6. Deletes active refresh tokens to force re-authentication across devices.
+     * 7. Sends password-changed email notification.
+     * 8. Logs PASSWORD_CHANGED audit log entry on success.
+     */
+    @Transactional
+    public void changePassword(ChangePasswordRequestDTO request) {
+        String email = SecurityUtils.getCurrentUsername();
+        if (email == null) {
+            throw new UnauthorizedException("Not authenticated.");
+        }
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new BadRequestException("This account was created via social login and does not have a password to change. Please continue signing in with Google.");
+        }
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect.");
+        }
+
+        if (request.getNewPassword().equals(request.getOldPassword())) {
+            throw new BadRequestException("New password must be different from your current password.");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        refreshTokenService.deleteByUser(user);
+
+        try {
+            emailUtil.sendPasswordChangedNotice(user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send password changed notice email for {}: {}", user.getEmail(), e.getMessage());
+        }
+
+        auditLogService.logAction(AuditLogAction.PASSWORD_CHANGED, "Password changed for user: " + user.getEmail(), user.getEmail());
+    }
+
     private String extractClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
