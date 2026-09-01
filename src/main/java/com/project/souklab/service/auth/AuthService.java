@@ -3,7 +3,7 @@ package com.project.souklab.service.auth;
 import com.project.souklab.config.AppProperties;
 import com.project.souklab.dao.*;
 import com.project.souklab.dto.auth.*;
-import com.project.souklab.dto.profile.ArtisanProfileResponseDTO;
+import com.project.souklab.dto.profile.ArtisanResponseDTO;
 import com.project.souklab.dto.profile.ClientProfileResponseDTO;
 import com.project.souklab.dto.profile.ProfileResponse;
 import com.project.souklab.exception.BadRequestException;
@@ -42,7 +42,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OAuthIdentityRepository oauthIdentityRepository;
-    private final ArtisanProfileRepository artisanProfileRepository;
+    private final ArtisanRepository artisanRepository;
     private final ClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
@@ -249,8 +249,8 @@ public class AuthService {
                 .anyMatch(r -> r.getName().equals("ROLE_CLIENT"));
 
         if (isArtisan) {
-            ArtisanProfile profile = artisanProfileRepository.findById(user.getId())
-                    .orElse(ArtisanProfile.builder().user(user).build());
+            Artisan profile = artisanRepository.findById(user.getId())
+                    .orElse(Artisan.builder().user(user).build());
 
             if (dto.getBio() != null) profile.setBio(dto.getBio());
             if (dto.resolveRegionId() != null) profile.setRegionId(dto.resolveRegionId());
@@ -260,8 +260,8 @@ public class AuthService {
             if (dto.getSubCategoryId() != null) profile.setSubCategoryId(dto.getSubCategoryId());
             // NOTE: isTeacher is NOT settable here — controlled exclusively by ArtisanFormateurService.
 
-            artisanProfileRepository.save(profile);
-            user.setArtisanProfile(profile);
+            artisanRepository.save(profile);
+            user.setArtisan(profile);
         } else if (isClient) {
             Client client = clientRepository.findById(user.getId())
                     .orElse(Client.builder().user(user).build());
@@ -388,7 +388,7 @@ public class AuthService {
 
     /**
      * Produces a role-specific login user summary embedded in the JWT response.
-     * Clients receive ClientProfileResponseDTO; Artisans receive ArtisanProfileResponseDTO.
+     * Clients receive ClientProfileResponseDTO; Artisans receive ArtisanResponseDTO.
      * This replaces the old shared UserSummaryDTO that leaked artisan-specific fields to clients.
      */
     public ProfileResponse mapToLoginSummary(User user) {
@@ -398,8 +398,8 @@ public class AuthService {
     /**
      * Dispatches to the correct role-specific profile DTO.
      * Clients → ClientProfileResponseDTO (no artisan fields)
-     * Artisans → ArtisanProfileResponseDTO (full artisan fields)
-     * Admins/unknown → ArtisanProfileResponseDTO as fallback (admin tooling uses UserResponseDTO separately)
+     * Artisans → ArtisanResponseDTO (full artisan fields)
+     * Admins/unknown → ArtisanResponseDTO as fallback (admin tooling uses UserResponseDTO separately)
      */
     public ProfileResponse mapToProfileResponse(User user) {
         boolean isArtisan = user.getRoles().stream()
@@ -410,8 +410,8 @@ public class AuthService {
                 .collect(Collectors.toSet());
 
         if (isArtisan) {
-            ArtisanProfile profile = user.getArtisanProfile();
-            return ArtisanProfileResponseDTO.builder()
+            Artisan profile = user.getArtisan();
+            return ArtisanResponseDTO.builder()
                     .id(user.getId())
                     .email(user.getEmail())
                     .firstName(user.getFirstName())
@@ -467,10 +467,10 @@ public class AuthService {
                 .map(Role::getName)
                 .orElse("ROLE_CLIENT");
 
-        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
-        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
+        boolean isTeacher = user.getArtisan() != null && user.getArtisan().isTeacher();
+        boolean isPremium = (user.getArtisan() != null && user.getArtisan().isPremium())
                 || (user.getClient() != null && user.getClient().isPremium());
-        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
+        boolean isValidated = (user.getArtisan() != null && user.getArtisan().isVerified())
                 || (user.getClient() != null && user.getClient().isVerified());
 
         return UserSummaryDTO.builder()
@@ -495,10 +495,10 @@ public class AuthService {
                 .map(Role::getName)
                 .orElse("ROLE_CLIENT");
 
-        boolean isTeacher = user.getArtisanProfile() != null && user.getArtisanProfile().isTeacher();
-        boolean isPremium = (user.getArtisanProfile() != null && user.getArtisanProfile().isPremium())
+        boolean isTeacher = user.getArtisan() != null && user.getArtisan().isTeacher();
+        boolean isPremium = (user.getArtisan() != null && user.getArtisan().isPremium())
                 || (user.getClient() != null && user.getClient().isPremium());
-        boolean isValidated = (user.getArtisanProfile() != null && user.getArtisanProfile().isVerified())
+        boolean isValidated = (user.getArtisan() != null && user.getArtisan().isVerified())
                 || (user.getClient() != null && user.getClient().isVerified());
 
         return UserResponseDTO.builder()

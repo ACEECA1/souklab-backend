@@ -20,7 +20,7 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ArtisanProfileResponseDTO implements ProfileResponse {
+public class ArtisanResponseDTO implements ProfileResponse {
 
     // --- User fields ---
     private String id;
@@ -38,7 +38,7 @@ public class ArtisanProfileResponseDTO implements ProfileResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // --- ArtisanProfile fields ---
+    // --- Artisan fields ---
     private String bio;
     private String regionId;
     private String city;
@@ -53,7 +53,7 @@ public class ArtisanProfileResponseDTO implements ProfileResponse {
     private boolean teacher;
 
     /**
-     * Whether the artisan's credentials have been admin-verified (artisan_profiles.is_verified).
+     * Whether the artisan's credentials have been admin-verified (artisans.is_verified).
      */
     private boolean verified;
 

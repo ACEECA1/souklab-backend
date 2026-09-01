@@ -39,6 +39,9 @@ build/
 
 ### Custom ###
 storage/
-.postman/
+.postman/*.postman_environment.json
+!.postman/*.postman_environment.example.json
 postman/.dependencies/
 .tours/
+
+CLAUDE.md

@@ -85,7 +85,7 @@ public class User extends BaseEntity {
     private Set<OAuthIdentity> oauthIdentities = new HashSet<>();
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private ArtisanProfile artisanProfile;
+    private Artisan artisan;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Client client;
