@@ -1,9 +1,13 @@
 package com.project.souklab.service.auth;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.project.souklab.config.AppProperties;
 import com.project.souklab.dao.*;
 import com.project.souklab.dto.auth.*;
+import com.project.souklab.dto.profile.ArtisanPatchDTO;
 import com.project.souklab.dto.profile.ArtisanResponseDTO;
+import com.project.souklab.dto.profile.ClientPatchDTO;
 import com.project.souklab.dto.profile.ClientProfileResponseDTO;
 import com.project.souklab.dto.profile.ProfileResponse;
 import com.project.souklab.exception.BadRequestException;
@@ -20,6 +24,9 @@ import com.project.souklab.service.security.VerificationTokenService;
 import com.project.souklab.util.EmailUtil;
 import com.project.souklab.util.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -52,6 +59,8 @@ public class AuthService {
     private final VerificationTokenService verificationTokenService;
     private final EmailUtil emailUtil;
     private final AuditLogService auditLogService;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
 
     /**
      * Registers a new user.
@@ -268,8 +277,121 @@ public class AuthService {
 
             if (dto.getClientType() != null) client.setClientType(dto.getClientType());
             if (dto.getCompanyName() != null) client.setCompanyName(dto.getCompanyName());
+            if (dto.getBio() != null) client.setBio(dto.getBio());
+            if (dto.getAddress() != null) client.setAddress(dto.getAddress());
             if (dto.resolveRegionId() != null) client.setRegionId(dto.resolveRegionId());
             if (dto.getCity() != null) client.setCity(dto.getCity());
+
+            clientRepository.save(client);
+            user.setClient(client);
+        }
+
+        return mapToProfileResponse(user);
+    }
+
+    /**
+     * Partially updates (PATCH) the authenticated user's profile based on their role.
+     * Follows "omitted = unchanged, explicit null = clear" semantics.
+     * Unknown/unpatchable fields (like isTeacher, accountStatus, email) are silently ignored.
+     */
+    @Transactional
+    public ProfileResponse patchCurrentUser(JsonNode payload) {
+        String email = SecurityUtils.getCurrentUsername();
+        if (email == null) {
+            throw new UnauthorizedException("Not authenticated.");
+        }
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+
+        boolean isArtisan = user.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
+        boolean isClient = user.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_CLIENT"));
+
+        if (!isArtisan && !isClient) {
+            throw new ForbiddenException("Administrators do not possess an editable artisan or client profile.");
+        }
+
+        if (payload == null || payload.isNull() || payload.isEmpty()) {
+            return mapToProfileResponse(user);
+        }
+
+        if (isArtisan) {
+            ArtisanPatchDTO patchDTO;
+            try {
+                patchDTO = objectMapper.treeToValue(payload, ArtisanPatchDTO.class);
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid JSON payload for artisan profile update: " + e.getMessage());
+            }
+
+            Set<ConstraintViolation<ArtisanPatchDTO>> violations = validator.validate(patchDTO);
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException(violations);
+            }
+
+            Artisan artisan = artisanRepository.findById(user.getId())
+                    .orElse(Artisan.builder().user(user).build());
+
+            if (payload.has("bio")) {
+                artisan.setBio(payload.get("bio").isNull() ? null : patchDTO.getBio());
+            }
+            if (payload.has("regionId")) {
+                artisan.setRegionId(payload.get("regionId").isNull() ? null : patchDTO.getRegionId());
+            } else if (payload.has("region")) {
+                artisan.setRegionId(payload.get("region").isNull() ? null : patchDTO.resolveRegionId());
+            }
+            if (payload.has("city")) {
+                artisan.setCity(payload.get("city").isNull() ? null : patchDTO.getCity());
+            }
+            if (payload.has("address")) {
+                artisan.setAddress(payload.get("address").isNull() ? null : patchDTO.getAddress());
+            }
+            if (payload.has("website")) {
+                artisan.setWebsite(payload.get("website").isNull() ? null : patchDTO.getWebsite());
+            }
+            if (payload.has("subCategoryId")) {
+                artisan.setSubCategoryId(payload.get("subCategoryId").isNull() ? null : patchDTO.getSubCategoryId());
+            }
+
+            artisanRepository.save(artisan);
+            user.setArtisan(artisan);
+        } else {
+            ClientPatchDTO patchDTO;
+            try {
+                patchDTO = objectMapper.treeToValue(payload, ClientPatchDTO.class);
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid JSON payload for client profile update: " + e.getMessage());
+            }
+
+            Set<ConstraintViolation<ClientPatchDTO>> violations = validator.validate(patchDTO);
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException(violations);
+            }
+
+            Client client = clientRepository.findById(user.getId())
+                    .orElse(Client.builder().user(user).build());
+
+            if (payload.has("bio")) {
+                client.setBio(payload.get("bio").isNull() ? null : patchDTO.getBio());
+            }
+            if (payload.has("address")) {
+                client.setAddress(payload.get("address").isNull() ? null : patchDTO.getAddress());
+            }
+            if (payload.has("regionId")) {
+                client.setRegionId(payload.get("regionId").isNull() ? null : patchDTO.getRegionId());
+            } else if (payload.has("region")) {
+                client.setRegionId(payload.get("region").isNull() ? null : patchDTO.resolveRegionId());
+            }
+            if (payload.has("city")) {
+                client.setCity(payload.get("city").isNull() ? null : patchDTO.getCity());
+            }
+            if (payload.has("companyName")) {
+                client.setCompanyName(payload.get("companyName").isNull() ? null : patchDTO.getCompanyName());
+            }
+            if (payload.has("clientType")) {
+                client.setClientType(payload.get("clientType").isNull() ? null : patchDTO.getClientType());
+            }
 
             clientRepository.save(client);
             user.setClient(client);
@@ -440,6 +562,7 @@ public class AuthService {
         }
 
         // Default: client path
+        Client client = user.getClient();
         return ClientProfileResponseDTO.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -454,6 +577,12 @@ public class AuthService {
                 .emailVerifiedAt(user.getEmailVerifiedAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
+                .clientType(client != null ? client.getClientType() : "INDIVIDUAL")
+                .companyName(client != null ? client.getCompanyName() : null)
+                .bio(client != null ? client.getBio() : null)
+                .address(client != null ? client.getAddress() : null)
+                .regionId(client != null ? client.getRegionId() : null)
+                .city(client != null ? client.getCity() : null)
                 .build();
     }
 

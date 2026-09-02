@@ -1,5 +1,6 @@
 package com.project.souklab.controller.auth;
 
+import tools.jackson.databind.JsonNode;
 import com.project.souklab.dto.auth.*;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.dto.profile.ProfileResponse;
@@ -93,6 +94,12 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<ProfileResponse>> getCurrentUser() {
         return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser()));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<ProfileResponse>> patchCurrentUser(@RequestBody(required = false) JsonNode requestBody) {
+        ProfileResponse response = authService.patchCurrentUser(requestBody);
+        return ResponseEntity.ok(ApiResponse.success(response, "Profile updated successfully."));
     }
 
     @PostMapping("/complete-profile")

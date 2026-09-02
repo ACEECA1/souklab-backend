@@ -32,6 +32,12 @@ public class Client {
     @Column(name = "company_name")
     private String companyName;
 
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    @Column(length = 255)
+    private String address;
+
     @Column(name = "region_id", length = 36)
     private String regionId;
 
