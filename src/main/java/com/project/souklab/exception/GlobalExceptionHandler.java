@@ -105,7 +105,7 @@ public class GlobalExceptionHandler {
         String username = SecurityUtils.getCurrentUsername();
         log.warn("AccessDeniedException for user [{}]: {}", username != null ? username : "anonymous", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("Access denied"));
+                .body(ApiResponse.error("FORBIDDEN", "You do not have permission to perform this action."));
     }
 
     /**
