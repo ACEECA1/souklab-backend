@@ -47,6 +47,15 @@ Comprehensive technical documentation is maintained in the [`docs/`](./docs) fol
 - MySQL 8.0+ running on `localhost:3306`
 - Elasticsearch 8.x running on `localhost:9200` (optional for non-search tests)
 
+### Local S3 Storage (MinIO)
+Start the local S3-compatible storage container via Docker Compose:
+```bash
+docker compose up -d minio
+```
+- **S3 API Endpoint**: `http://localhost:9000` (used by Spring Boot backend)
+- **MinIO Web Console**: `http://localhost:9001` (login: `minioadmin` / `minioadmin_secret` or configured `.env` values)
+- **Health Check**: `curl -sI http://localhost:9000/minio/health/live`
+
 ### Build and Test
 ```bash
 # Clean and compile

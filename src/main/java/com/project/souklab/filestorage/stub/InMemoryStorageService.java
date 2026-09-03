@@ -23,13 +23,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><strong>DEVELOPMENT / TEST STUB ONLY:</strong>
  * This class exists solely to prove the {@link StorageService} interface, metadata model,
  * and pre-storage validation pipeline in Phase D.0a without requiring external infrastructure.
- * It is NOT suitable for production and will be accompanied by S3/MinIO in Phase D.0b.
+ * It is accompanied by S3StorageService in Phase D.0b.
  */
 @Slf4j
 public class InMemoryStorageService implements StorageService {
 
     private final Map<String, StoredFile> store = new ConcurrentHashMap<>();
 
+    /**
+     * In-memory file representation.
+     */
     private record StoredFile(
             byte[] data,
             String originalFilename,
@@ -37,6 +40,17 @@ public class InMemoryStorageService implements StorageService {
             Instant storedAt
     ) {}
 
+    /**
+     * Stores file content in memory.
+     * Generates a safe, opaque UUID-based storage key to ensure path isolation,
+     * never using the original filename as a storage path segment.
+     *
+     * @param content stream to store
+     * @param originalFilename original user filename hint
+     * @param contentType MIME type
+     * @param size size in bytes
+     * @return StorageResult containing generated storage key and metadata
+     */
     @Override
     public StorageResult store(InputStream content, String originalFilename, String contentType, long size) {
         if (content == null) {
@@ -57,7 +71,6 @@ public class InMemoryStorageService implements StorageService {
             throw new StorageException("Failed to read input content stream for storage", e);
         }
 
-        // Generate safe, opaque UUID-based storage key (NEVER using original filename as path)
         String extension = extractExtension(originalFilename);
         String key = UUID.randomUUID().toString() + (extension.isEmpty() ? "" : "." + extension);
 
@@ -68,6 +81,13 @@ public class InMemoryStorageService implements StorageService {
         return new StorageResult(key, originalFilename, contentType, bytes.length, now);
     }
 
+    /**
+     * Retrieves a stored file from memory.
+     *
+     * @param key unique storage identifier
+     * @return StorageResource containing data stream and metadata
+     * @throws FileNotFoundStorageException if key is not found
+     */
     @Override
     public StorageResource retrieve(String key) {
         StoredFile file = store.get(key);
@@ -83,12 +103,23 @@ public class InMemoryStorageService implements StorageService {
         );
     }
 
+    /**
+     * Deletes an in-memory file by key.
+     *
+     * @param key unique storage identifier
+     */
     @Override
     public void delete(String key) {
         store.remove(key);
         log.debug("Deleted in-memory file with key '{}'", key);
     }
 
+    /**
+     * Checks if an in-memory file exists by key.
+     *
+     * @param key unique storage identifier
+     * @return true if file exists, false otherwise
+     */
     @Override
     public boolean exists(String key) {
         return store.containsKey(key);
@@ -101,6 +132,12 @@ public class InMemoryStorageService implements StorageService {
         store.clear();
     }
 
+    /**
+     * Extracts lowercase file extension from filename.
+     *
+     * @param filename filename string
+     * @return lowercase extension without dot, or empty string
+     */
     private String extractExtension(String filename) {
         if (filename == null) {
             return "";
