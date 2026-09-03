@@ -126,6 +126,13 @@
             <version>3.0.2</version>
         </dependency>
 
+        <!-- File Type Detection: Apache Tika Core (Magic-byte Content Sniffing) -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- Developer Tools & Boilerplate Reduction -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
