@@ -1,11 +1,13 @@
 package com.project.souklab.service.user;
 
+import com.project.souklab.dao.ArtisanRepository;
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.auth.UserResponseDTO;
 import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.exception.BadRequestException;
 import com.project.souklab.exception.ResourceNotFoundException;
 import com.project.souklab.model.AccountStatus;
+import com.project.souklab.model.Artisan;
 import com.project.souklab.model.AuditLogAction;
 import com.project.souklab.model.NotificationType;
 import com.project.souklab.model.Role;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 public class UserManagementService {
 
     private final UserRepository userRepository;
+    private final ArtisanRepository artisanRepository;
     private final AuditLogService auditLogService;
     private final RefreshTokenService refreshTokenService;
     private final NotificationService notificationService;
@@ -84,6 +87,12 @@ public class UserManagementService {
 
         user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
+
+        // If the approved user is an Artisan, set verified = true
+        artisanRepository.findById(userId).ifPresent(artisan -> {
+            artisan.setVerified(true);
+            artisanRepository.save(artisan);
+        });
 
         auditLogService.logAction(AuditLogAction.APPROVE_USER, "Approved user ID: " + userId);
         notificationService.createForUser(user, "Your account has been approved and is now active!", NotificationType.ACCOUNT_VALIDATED, user.getId());
