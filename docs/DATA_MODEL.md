@@ -61,12 +61,12 @@ All entity classes inherit from `BaseEntity`:
 - `permissions`: `id`, `resource` (e.g. `DIRECTORY`, `FORMATION`), `action` (e.g. `READ_FULL`, `CREATE`), `key` (e.g. `directory:read_full`)
 - `role_permissions`: Join table mapping `role_id` <-> `permission_id`
 
-#### `artisan_profiles`
+#### `artisans`
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | PK, FK -> `users.id` (1:1) | Shares PK with User |
 | `bio` | `TEXT` | Nullable | Detailed biography & background |
-| `region` | `VARCHAR(100)` | Nullable | Wilaya / Administrative region |
+| `region_id` | `VARCHAR(36)` | FK -> `regions.id` | Wilaya / Administrative region |
 | `city` | `VARCHAR(100)` | Nullable | City / Commune |
 | `address` | `VARCHAR(255)` | Nullable | Workshop street address |
 | `website` | `VARCHAR(255)` | Nullable | Website / Social page |
@@ -126,7 +126,7 @@ All entity classes inherit from `BaseEntity`:
 
 #### `formations`
 - `id`: `VARCHAR(36)` (PK)
-- `author_id`: `VARCHAR(36)` (FK -> `artisan_profiles.id`)
+- `author_id`: `VARCHAR(36)` (FK -> `artisans.id`)
 - `title`: `VARCHAR(255)` (Not Null)
 - `description`: `TEXT` (Not Null)
 - `thumbnail_url`: `VARCHAR(500)`

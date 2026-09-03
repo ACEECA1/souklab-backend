@@ -30,7 +30,7 @@ This roadmap breaks down the development of the **Souklab** production Spring Bo
 ---
 
 ## 📍 Phase 4: Artisan & Client Profiles
-- [ ] **Step 4.1**: Implement `ArtisanProfile`, `Client`, `ArtisanGalleryImage`, `ArtisanCertification`, `ArtisanAchievement`, `ArtisanSocialLink`, and join tables.
+- [ ] **Step 4.1**: Implement `Artisan`, `Client`, `ArtisanGalleryImage`, `ArtisanCertification`, `ArtisanAchievement`, `ArtisanSocialLink`, and join tables.
 - [ ] **Step 4.2**: Implement multi-step `/api/v1/auth/complete-profile` for artisans and clients.
 - [ ] **Step 4.3**: Implement `ArtisanService` and `ArtisanController` for portfolio, gallery, and certification management.
 - [ ] **Step 4.4**: Implement secure multi-part file upload with MIME validation and ClamAV antivirus inspection.
@@ -38,7 +38,7 @@ This roadmap breaks down the development of the **Souklab** production Spring Bo
 ---
 
 ## 📍 Phase 5: Elasticsearch Indexing & Public Directory Search
-- [ ] **Step 5.1**: Add Hibernate Search annotations (`@Indexed`, `@FullTextField`, `@KeywordField`) on `ArtisanProfile` and related entities.
+- [ ] **Step 5.1**: Add Hibernate Search annotations (`@Indexed`, `@FullTextField`, `@KeywordField`) on `Artisan` and related entities.
 - [ ] **Step 5.2**: Implement `DirectorySearchService` using Hibernate Search MassIndexer and boolean query builder.
 - [ ] **Step 5.3**: Implement `DirectoryController` (`/api/v1/public/directory`) supporting multi-criteria filtering (wilaya, category, material, era, technique, keyword, featured, rating).
 - [ ] **Step 5.4**: Add contact data masking logic for free vs. premium client access.

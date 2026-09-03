@@ -20,13 +20,13 @@ Every table representing a full domain entity includes standard auditing columns
 ### 1.3 Soft-Delete vs. Hard-Delete Policy
 | Classification | Soft-Delete (`deleted_at` present) | Hard-Delete / Immutable Append-Only | Rationale |
 | :--- | :--- | :--- | :--- |
-| **Domain Entities** | `users`, `artisan_profiles`, `clients`, `formations`, `feed_posts`, `artisan_gallery_images`, `artisan_certifications`, `artisan_achievements`, `artisan_social_links`, `conversations`, `messages`, `reviews` | — | User-facing assets that users or artisans can delete or archive, while preserving referential integrity and audit trails. |
+| **Domain Entities** | `users`, `artisans`, `clients`, `formations`, `feed_posts`, `artisan_gallery_images`, `artisan_certifications`, `artisan_achievements`, `artisan_social_links`, `conversations`, `messages`, `reviews` | — | User-facing assets that users or artisans can delete or archive, while preserving referential integrity and audit trails. |
 | **Join / Link Tables & Auth Links** | — | `user_roles`, `oauth_identities`, `verification_tokens`, `artisan_materials`, `artisan_techniques`, `artisan_epoques`, `conversation_participants` | Pure junction tables and third-party identity bindings. Associations and linked OAuth accounts are added/unlinked (hard-deleted) directly. |
 | **Financial & Ledger** | — | `payments`, `client_subscriptions`, `artisan_subscriptions`, `subscription_pricing` | Financial transaction history must remain immutable. Subscriptions transition to `CANCELLED` or `EXPIRED` status rather than being deleted. |
 | **Auditing & Moderation** | — | `audit_logs`, `payment_webhook_logs`, `artisan_validations`, `formation_reviews`, `formation_enrollments`, `reports`, `notifications` | Append-only security and administrative decision records. Must never be altered or deleted. |
 
 ### 1.4 Naming Rules
-- **Tables**: `snake_case`, pluralized (e.g., `artisan_profiles`, `formation_enrollments`).
+- **Tables**: `snake_case`, pluralized (e.g., `artisans`, `formation_enrollments`).
 - **Columns**: `snake_case` (e.g., `is_verified`, `sub_category_id`).
 - **Foreign Keys**: `<singular_referenced_table>_id` or descriptive semantic prefix (e.g., `author_id`, `parent_id`, `resolved_by`).
 - **Indexes**: `idx_<table_name>_<column(s)>` (or `uk_<table_name>_<column(s)>` for unique constraints).
@@ -63,7 +63,7 @@ Core identity record for all platform actors (Admins, Artisans, and Clients).
 - **Relationships**:
   - `ManyToMany` with `Role` via `user_roles` (owning side: `User`, fetch: `EAGER` for Spring Security authentication, cascade: none).
   - `OneToMany` with `OAuthIdentity` (mappedBy: `user`, fetch: `LAZY`, cascade: `ALL`, orphanRemoval: true).
-  - `OneToOne` with `ArtisanProfile` (mappedBy: `user`, fetch: `LAZY`, cascade: `ALL`).
+  - `OneToOne` with `Artisan` (mappedBy: `user`, fetch: `LAZY`, cascade: `ALL`).
   - `OneToOne` with `Client` (mappedBy: `user`, fetch: `LAZY`, cascade: `ALL`).
   - `OneToOne` with `RefreshToken` (mappedBy: `user`, fetch: `LAZY`, cascade: `ALL`, orphanRemoval: true).
   - `OneToMany` with `Notification` (mappedBy: `recipient`, fetch: `LAZY`, cascade: `ALL`).
@@ -174,7 +174,7 @@ Cryptographically hashed single-use verification and password-reset codes with a
 
 ## 3. Artisan & Client Domain
 
-### 3.1 `artisan_profiles`
+### 3.1 `artisans`
 Extended profile for craftspersons, workshop masters, and heritage practitioners.
 
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
@@ -198,12 +198,12 @@ Extended profile for craftspersons, workshop masters, and heritage practitioners
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
 - **Relationships**:
-  - `OneToOne` with `User` (owning side: `ArtisanProfile`, primary key joins on `users.id`).
+  - `OneToOne` with `User` (owning side: `Artisan`, primary key joins on `users.id`).
   - `ManyToOne` with `Region` (fetch: `LAZY`).
   - `ManyToOne` with `JobSubCategory` (fetch: `LAZY`).
-  - `ManyToMany` with `Material` via `artisan_materials` (owning side: `ArtisanProfile`, fetch: `LAZY`).
-  - `ManyToMany` with `Technique` via `artisan_techniques` (owning side: `ArtisanProfile`, fetch: `LAZY`).
-  - `ManyToMany` with `Epoque` via `artisan_epoques` (owning side: `ArtisanProfile`, fetch: `LAZY`).
+  - `ManyToMany` with `Material` via `artisan_materials` (owning side: `Artisan`, fetch: `LAZY`).
+  - `ManyToMany` with `Technique` via `artisan_techniques` (owning side: `Artisan`, fetch: `LAZY`).
+  - `ManyToMany` with `Epoque` via `artisan_epoques` (owning side: `Artisan`, fetch: `LAZY`).
   - `OneToMany` with `ArtisanGalleryImage` (mappedBy: `artisan`, fetch: `LAZY`, cascade: `ALL`, orphanRemoval: true).
   - `OneToMany` with `ArtisanCertification` (mappedBy: `artisan`, fetch: `LAZY`, cascade: `ALL`, orphanRemoval: true).
   - `OneToMany` with `ArtisanAchievement` (mappedBy: `artisan`, fetch: `LAZY`, cascade: `ALL`, orphanRemoval: true).
@@ -341,7 +341,7 @@ Raw materials hierarchy (e.g. *Métaux Précieux* -> *Argent Massif 925*).
 
 - **Relationships**:
   - `ManyToOne` from `Material` to `MaterialFamily` (fetch: `LAZY`).
-  - `ManyToMany` between `ArtisanProfile` and `Material` via `artisan_materials`.
+  - `ManyToMany` between `Artisan` and `Material` via `artisan_materials`.
 - **Indexes & Unique Constraints**:
   - `uk_material_families_slug` (`slug`), `uk_materials_slug` (`slug`): Unique constraints.
   - `idx_materials_family` (`family_id`, `display_order`): Retrieval by material family.
@@ -386,7 +386,7 @@ Heritage historical eras and traditional craftsmanship techniques.
 #### `artisan_materials`
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `material_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `materials.id` (`ON DELETE CASCADE`) |
 
 - **Indexes**: PK (`artisan_id`, `material_id`), `idx_art_mat_material` (`material_id`, `artisan_id`).
@@ -394,7 +394,7 @@ Heritage historical eras and traditional craftsmanship techniques.
 #### `artisan_techniques`
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `technique_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `techniques.id` (`ON DELETE CASCADE`) |
 
 - **Indexes**: PK (`artisan_id`, `technique_id`), `idx_art_tech_technique` (`technique_id`, `artisan_id`).
@@ -402,7 +402,7 @@ Heritage historical eras and traditional craftsmanship techniques.
 #### `artisan_epoques`
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `epoque_id` | `VARCHAR(36)` | `NO` | — | **PK, FK** -> `epoques.id` (`ON DELETE CASCADE`) |
 
 - **Indexes**: PK (`artisan_id`, `epoque_id`), `idx_art_epoque_epoque` (`epoque_id`, `artisan_id`).
@@ -417,7 +417,7 @@ Showcase imagery for an artisan's workshop and handcrafted masterpieces.
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `image_url` | `VARCHAR(500)` | `NO` | — | Stored image URI / path |
 | `title` | `VARCHAR(255)` | `YES` | `NULL` | Image artwork title |
 | `caption` | `TEXT` | `YES` | `NULL` | Artwork details and background |
@@ -426,7 +426,7 @@ Showcase imagery for an artisan's workshop and handcrafted masterpieces.
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
-- **Relationships**: `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+- **Relationships**: `ManyToOne` with `Artisan` (fetch: `LAZY`).
 - **Indexes**: `idx_gallery_artisan` (`artisan_id`, `deleted_at`, `display_order`).
 
 ---
@@ -437,7 +437,7 @@ Official artisan cards (Chambre d'Artisanat et des Métiers - CAM), diplomas, an
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `title` | `VARCHAR(255)` | `NO` | — | Certification title (e.g. *Carte d'Artisan Professionnel*) |
 | `issuer` | `VARCHAR(255)` | `NO` | — | Issuing institution (e.g. *CAM Tizi Ouzou*) |
 | `issued_at` | `DATE` | `YES` | `NULL` | Date of issuance |
@@ -448,7 +448,7 @@ Official artisan cards (Chambre d'Artisanat et des Métiers - CAM), diplomas, an
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
-- **Relationships**: `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+- **Relationships**: `ManyToOne` with `Artisan` (fetch: `LAZY`).
 - **Indexes**: `idx_cert_artisan` (`artisan_id`, `deleted_at`).
 
 ---
@@ -459,7 +459,7 @@ Major projects, architectural restorations, exhibitions, and cultural awards.
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `title` | `VARCHAR(255)` | `NO` | — | Project / Award title |
 | `description` | `TEXT` | `YES` | `NULL` | Detailed description of the work |
 | `image_url` | `VARCHAR(500)` | `YES` | `NULL` | Feature photograph URL |
@@ -470,7 +470,7 @@ Major projects, architectural restorations, exhibitions, and cultural awards.
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
-- **Relationships**: `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+- **Relationships**: `ManyToOne` with `Artisan` (fetch: `LAZY`).
 - **Indexes**: `idx_achieve_artisan` (`artisan_id`, `deleted_at`, `display_order`).
 
 ---
@@ -481,14 +481,14 @@ External social presence channels (Instagram, Facebook, TikTok, YouTube, LinkedI
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `platform` | `VARCHAR(50)` | `NO` | — | Enum/String: `INSTAGRAM`, `FACEBOOK`, `TIKTOK`, `YOUTUBE`, `LINKEDIN` |
 | `url` | `VARCHAR(500)` | `NO` | — | Verified channel URL |
 | `created_at` | `DATETIME(6)` | `NO` | — | Audit creation timestamp |
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
-- **Relationships**: `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+- **Relationships**: `ManyToOne` with `Artisan` (fetch: `LAZY`).
 - **Indexes**: `idx_social_artisan` (`artisan_id`, `platform`).
 
 ---
@@ -499,7 +499,7 @@ Immutable administrative audit log of profile validations, rejections, suspensio
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `admin_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `users.id` (`ON DELETE RESTRICT`) |
 | `action` | `VARCHAR(30)` | `NO` | — | Enum: `APPROVED`, `REJECTED`, `SUSPENDED`, `REACTIVATED` |
 | `note` | `TEXT` | `YES` | `NULL` | Administrative decision justification / remarks |
@@ -508,7 +508,7 @@ Immutable administrative audit log of profile validations, rejections, suspensio
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit timestamp |
 
 - **Relationships**:
-  - `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+  - `ManyToOne` with `Artisan` (fetch: `LAZY`).
   - `ManyToOne` with `User` (`admin`, fetch: `LAZY`).
 - **Indexes**: `idx_art_validations_artisan` (`artisan_id`, `performed_at` DESC).
 
@@ -522,7 +522,7 @@ Workshops, courses, and apprenticeship masterclasses authored by verified teache
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `author_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `author_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `title` | `VARCHAR(255)` | `NO` | — | Workshop title |
 | `description` | `TEXT` | `NO` | — | Full curriculum, prerequisites, and learning objectives |
 | `thumbnail_url` | `VARCHAR(500)` | `YES` | `NULL` | Course promotional cover image |
@@ -539,7 +539,7 @@ Workshops, courses, and apprenticeship masterclasses authored by verified teache
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
 - **Relationships**:
-  - `ManyToOne` with `ArtisanProfile` (owning side: `Formation`, fetch: `LAZY`).
+  - `ManyToOne` with `Artisan` (owning side: `Formation`, fetch: `LAZY`).
   - `OneToMany` with `FormationEnrollment` (mappedBy: `formation`, fetch: `LAZY`, cascade: `ALL`).
   - `OneToMany` with `FormationReview` (mappedBy: `formation`, fetch: `LAZY`, cascade: `ALL`).
   - `OneToMany` with `FeedPost` (mappedBy: `formation`, fetch: `LAZY`).
@@ -685,7 +685,7 @@ Client testimonials and 1-5 star ratings for verified artisan collaborations.
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `client_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `clients.id` (`ON DELETE CASCADE`) |
 | `rating` | `INT` | `NO` | — | Rating integer from `1` to `5` (`CHECK (rating >= 1 AND rating <= 5)`) |
 | `comment` | `TEXT` | `YES` | `NULL` | Testimonial text feedback |
@@ -696,7 +696,7 @@ Client testimonials and 1-5 star ratings for verified artisan collaborations.
 | `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Soft-delete timestamp |
 
 - **Relationships**:
-  - `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+  - `ManyToOne` with `Artisan` (fetch: `LAZY`).
   - `ManyToOne` with `Client` (fetch: `LAZY`).
 - **Indexes & Unique Constraints**:
   - `uk_reviews_artisan_client` (`artisan_id`, `client_id`, `deleted_at`): Ensures one active review per client per artisan (updates permitted).
@@ -784,7 +784,7 @@ Active and historical premium visibility & promotion plans for Artisans.
 | Column Name | SQL Type | Nullable | Default | Constraints & Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
-| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisan_profiles.id` (`ON DELETE CASCADE`) |
+| `artisan_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `artisans.id` (`ON DELETE CASCADE`) |
 | `pricing_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `subscription_pricing.id` (`ON DELETE RESTRICT`) |
 | `plan` | `VARCHAR(30)` | `NO` | — | Enum: `FREEMIUM`, `PREMIUM_MONTHLY`, `PREMIUM_YEARLY` |
 | `status` | `VARCHAR(30)` | `NO` | `'ACTIVE'` | Enum: `ACTIVE`, `EXPIRED`, `CANCELLED`, `PENDING_PAYMENT` |
@@ -795,7 +795,7 @@ Active and historical premium visibility & promotion plans for Artisans.
 | `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
 
 - **Relationships**:
-  - `ManyToOne` with `ArtisanProfile` (fetch: `LAZY`).
+  - `ManyToOne` with `Artisan` (fetch: `LAZY`).
   - `ManyToOne` with `SubscriptionPricing` (fetch: `LAZY`).
   - `OneToMany` with `Payment` (mappedBy: `artisanSubscription`, fetch: `LAZY`).
 - **Indexes & Unique Constraints**:
@@ -873,7 +873,7 @@ Append-only system-wide security, administrative, and domain event ledger.
 | `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
 | `actor_id` | `VARCHAR(36)` | `YES` | `NULL` | **FK** -> `users.id` (`ON DELETE SET NULL`, null for system crons) |
 | `action` | `VARCHAR(50)` | `NO` | — | Enum: `AuditLogAction` |
-| `target_entity_type`| `VARCHAR(50)` | `NO` | — | Target entity name (e.g. `USER`, `ARTISAN_PROFILE`, `FORMATION`) |
+| `target_entity_type`| `VARCHAR(50)` | `NO` | — | Target entity name (e.g. `USER`, `ARTISAN`, `FORMATION`) |
 | `target_entity_id` | `VARCHAR(36)` | `NO` | — | Target entity UUID |
 | `details` | `JSON` | `YES` | `NULL` | Structured context payload (diffs, parameters, metadata) |
 | `ip_address` | `VARCHAR(45)` | `YES` | `NULL` | Originating client IP address |
@@ -914,8 +914,8 @@ Realtime in-app notification records dispatched via WebSocket STOMP and persiste
 
 The following architectural and design decisions were made to guarantee performance, maintainability, and clean decoupling:
 
-1. **Shared Primary Key Pattern for `ArtisanProfile` and `Client`**:
-   - `artisan_profiles.id` and `clients.id` share the exact primary key with `users.id` (1:1 with `@MapsId` in JPA).
+1. **Shared Primary Key Pattern for `Artisan` and `Client`**:
+   - `artisans.id` and `clients.id` share the exact primary key with `users.id` (1:1 with `@MapsId` in JPA).
    - *Rationale*: Guarantees identity consistency, eliminates redundant foreign key joins when navigating from user to profile, and simplifies access control in `@PreAuthorize` SpEL checks (e.g. `#id == authentication.principal.id`).
 
 2. **Directory Search: Hybrid MySQL + Hibernate Search / Elasticsearch Strategy**:

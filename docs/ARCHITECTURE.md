@@ -92,7 +92,7 @@ com.project.souklab
 │
 ├── model/                   # JPA Entities (extending BaseEntity)
 │   ├── common/              # BaseEntity.java, AuditLog.java
-│   ├── user/                # User.java, Role.java, Permission.java, RefreshToken.java, Client.java, ArtisanProfile.java
+│   ├── user/                # User.java, Role.java, Permission.java, RefreshToken.java, Client.java, Artisan.java
 │   ├── catalog/             # Region.java, JobCategory.java, JobSubCategory.java, MaterialFamily.java, Material.java, Epoque.java, Technique.java
 │   ├── artisan/             # ArtisanGalleryImage.java, ArtisanCertification.java, ArtisanAchievement.java, ArtisanSocialLink.java, ArtisanValidation.java
 │   ├── formation/           # Formation.java, FormationEnrollment.java, FormationReview.java
@@ -101,7 +101,7 @@ com.project.souklab
 │
 ├── dao/                     # JPA Repositories
 │   ├── UserRepository.java
-│   ├── ArtisanProfileRepository.java
+│   ├── ArtisanRepository.java
 │   ├── RegionRepository.java
 │   ├── JobCategoryRepository.java
 │   ├── FormationRepository.java
@@ -168,7 +168,7 @@ Incoming HTTP Request
 ## 4. Full-Text Search with Hibernate Search & Elasticsearch
 
 ### Index Structure
-- `ArtisanProfile` is the root `@Indexed` entity.
+- `Artisan` is the root `@Indexed` entity.
 - Indexed fields include:
   - `@FullTextField`: `bio`, `user.name`, `city`, `address`
   - `@KeywordField`: `subCategory.id`, `subCategory.category.id`, `region.id`, `region.slug`
