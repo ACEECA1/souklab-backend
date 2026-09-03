@@ -1,0 +1,296 @@
+package com.project.souklab.service.formateur;
+
+import com.project.souklab.dao.ArtisanFormateurRequestRepository;
+import com.project.souklab.dao.ArtisanRepository;
+import com.project.souklab.dao.UserRepository;
+import com.project.souklab.dto.common.PaginatedResponse;
+import com.project.souklab.dto.formateur.*;
+import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ConflictException;
+import com.project.souklab.exception.ForbiddenException;
+import com.project.souklab.exception.ResourceNotFoundException;
+import com.project.souklab.model.*;
+import com.project.souklab.service.notification.NotificationService;
+import com.project.souklab.util.EmailUtil;
+import com.project.souklab.util.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class ArtisanFormateurService {
+
+    private final ArtisanFormateurRequestRepository formateurRequestRepository;
+    private final ArtisanRepository artisanRepository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final EmailUtil emailUtil;
+
+    /**
+     * Submits a new formateur status request for the authenticated artisan.
+     */
+    @Transactional
+    public FormateurRequestResponseDTO submitRequest(FormateurRequestDTO dto) {
+        String email = SecurityUtils.getCurrentUsername();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+
+        if (user.getStatus() != AccountStatus.ACTIVE) {
+            throw new ForbiddenException("Your account must be ACTIVE to submit a Formateur request. Current status: " + user.getStatus());
+        }
+
+        Artisan profile = artisanRepository.findById(user.getId())
+                .orElseThrow(() -> new ForbiddenException("Only registered artisans can request Formateur status."));
+
+        if (profile.isTeacher()) {
+            throw new ConflictException("You are already an approved Formateur.");
+        }
+
+        if (formateurRequestRepository.existsByArtisanAndStatusAndDeletedAtIsNull(profile, FormateurRequestStatus.PENDING)) {
+            throw new ConflictException("You already have a pending Formateur request.");
+        }
+
+        Optional<ArtisanFormateurRequest> latestOpt = formateurRequestRepository.findFirstByArtisanAndDeletedAtIsNullOrderByCreatedAtDesc(profile);
+        if (latestOpt.isPresent()) {
+            ArtisanFormateurRequest latest = latestOpt.get();
+            if (!latest.isCanReapply()) {
+                throw new ForbiddenException("You are permanently blocked from submitting new Formateur requests.");
+            }
+            if (latest.getCooldownUntil() != null && latest.getCooldownUntil().isAfter(LocalDateTime.now())) {
+                throw new ForbiddenException("You cannot submit a request during the cooldown period. Cooldown expires on: " + latest.getCooldownUntil());
+            }
+        }
+
+        ArtisanFormateurRequest request = ArtisanFormateurRequest.builder()
+                .artisan(profile)
+                .status(FormateurRequestStatus.PENDING)
+                .motivation(dto != null ? dto.getMotivation() : null)
+                .canReapply(true)
+                .cooldownUntil(null)
+                .build();
+
+        ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
+
+        // Dual-dispatch to all admins: in-app + email
+        List<User> admins = userRepository.findByRoleName("ROLE_ADMIN");
+        String artisanName = (user.getFirstName() != null ? user.getFirstName() + " " : "") + (user.getLastName() != null ? user.getLastName() : "");
+        String notifMsg = "New artisan formateur request submitted by " + user.getEmail()
+                + (dto != null && dto.getMotivation() != null && !dto.getMotivation().isBlank() ? ": \"" + dto.getMotivation() + "\"" : "");
+        for (User admin : admins) {
+            notificationService.createForUser(admin, notifMsg, NotificationType.FORMATEUR_REQUEST_SUBMITTED, saved.getId());
+            emailUtil.sendFormateurRequestSubmittedNoticeToAdmin(admin.getEmail(), user.getEmail(), dto != null ? dto.getMotivation() : null);
+        }
+
+        return mapToDTO(saved);
+    }
+
+    /**
+     * Retrieves a paginated list of pending formateur requests for administrators.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<FormateurRequestResponseDTO> getPendingRequests(Pageable pageable) {
+        Page<ArtisanFormateurRequest> page = formateurRequestRepository
+                .findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(FormateurRequestStatus.PENDING, pageable);
+        return PaginatedResponse.from(page.map(this::mapToDTO));
+    }
+
+    /**
+     * Approves a pending formateur request.
+     */
+    @Transactional
+    public FormateurRequestResponseDTO approveRequest(String requestId, FormateurApproveDTO dto) {
+        String adminEmail = SecurityUtils.getCurrentUsername();
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+
+        ArtisanFormateurRequest request = formateurRequestRepository.findByIdAndDeletedAtIsNull(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Formateur request not found with id: " + requestId));
+
+        if (request.getStatus() != FormateurRequestStatus.PENDING) {
+            throw new BadRequestException("Request is already " + request.getStatus() + ".");
+        }
+
+        request.setStatus(FormateurRequestStatus.APPROVED);
+        request.setAdminNote(dto.getAdminNote());
+        request.setDecidedBy(admin);
+        request.setDecidedAt(LocalDateTime.now());
+
+        Artisan artisan = request.getArtisan();
+        artisan.setTeacher(true);
+        artisanRepository.save(artisan);
+
+        ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
+
+        // Dual-dispatch to artisan: in-app + email
+        User artisanUser = artisan.getUser();
+        notificationService.createForUser(artisanUser, "Your request for Formateur status has been approved! Note: " + dto.getAdminNote(),
+                NotificationType.FORMATEUR_APPROVED, saved.getId());
+        emailUtil.sendFormateurApprovedEmail(artisanUser.getEmail(), dto.getAdminNote());
+
+        return mapToDTO(saved);
+    }
+
+    /**
+     * Rejects a pending formateur request.
+     */
+    @Transactional
+    public FormateurRequestResponseDTO rejectRequest(String requestId, FormateurRejectDTO dto) {
+        String adminEmail = SecurityUtils.getCurrentUsername();
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+
+        ArtisanFormateurRequest request = formateurRequestRepository.findByIdAndDeletedAtIsNull(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Formateur request not found with id: " + requestId));
+
+        if (request.getStatus() != FormateurRequestStatus.PENDING) {
+            throw new BadRequestException("Request is already " + request.getStatus() + ".");
+        }
+
+        boolean canReapply = dto.getCanReapply() != null ? dto.getCanReapply() : true;
+        LocalDateTime cooldownUntil = null;
+        if (canReapply) {
+            cooldownUntil = dto.getCooldownUntil() != null ? dto.getCooldownUntil() : LocalDateTime.now().plusDays(14);
+        }
+
+        request.setStatus(FormateurRequestStatus.REJECTED);
+        request.setAdminNote(dto.getAdminNote());
+        request.setCanReapply(canReapply);
+        request.setCooldownUntil(cooldownUntil);
+        request.setDecidedBy(admin);
+        request.setDecidedAt(LocalDateTime.now());
+
+        ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
+
+        // Dual-dispatch to artisan: in-app + email
+        User artisanUser = request.getArtisan().getUser();
+        notificationService.createForUser(artisanUser, "Your Formateur request was rejected. Note: " + dto.getAdminNote(),
+                NotificationType.FORMATEUR_REJECTED, saved.getId());
+        emailUtil.sendFormateurRejectedEmail(artisanUser.getEmail(), dto.getAdminNote(), cooldownUntil, canReapply);
+
+        return mapToDTO(saved);
+    }
+
+    /**
+     * Directly grants formateur status to an artisan without a prior request.
+     */
+    @Transactional
+    public FormateurRequestResponseDTO grantDirectly(String artisanId, FormateurGrantDTO dto) {
+        String adminEmail = SecurityUtils.getCurrentUsername();
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+
+        Artisan artisan = artisanRepository.findById(artisanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+
+        if (artisan.isTeacher()) {
+            throw new BadRequestException("Artisan is already an approved Formateur.");
+        }
+
+        artisan.setTeacher(true);
+        artisanRepository.save(artisan);
+
+        ArtisanFormateurRequest auditRecord = ArtisanFormateurRequest.builder()
+                .artisan(artisan)
+                .status(FormateurRequestStatus.APPROVED)
+                .motivation(null)
+                .adminNote(dto.getAdminNote())
+                .canReapply(true)
+                .cooldownUntil(null)
+                .decidedBy(admin)
+                .decidedAt(LocalDateTime.now())
+                .build();
+
+        ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(auditRecord);
+
+        // Dual-dispatch to artisan: in-app + email
+        User artisanUser = artisan.getUser();
+        notificationService.createForUser(artisanUser, "You have been granted Formateur status by an administrator! Note: " + dto.getAdminNote(),
+                NotificationType.FORMATEUR_GRANTED, saved.getId());
+        emailUtil.sendFormateurGrantedEmail(artisanUser.getEmail(), dto.getAdminNote());
+
+        return mapToDTO(saved);
+    }
+
+    /**
+     * Directly revokes formateur status from an artisan.
+     */
+    @Transactional
+    public void revokeDirectly(String artisanId, FormateurRevokeDTO dto) {
+        String adminEmail = SecurityUtils.getCurrentUsername();
+        userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+
+        Artisan artisan = artisanRepository.findById(artisanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+
+        if (!artisan.isTeacher()) {
+            throw new BadRequestException("Artisan is not currently an approved Formateur.");
+        }
+
+        artisan.setTeacher(false);
+        artisanRepository.save(artisan);
+
+        // Dual-dispatch to artisan: in-app + email
+        User artisanUser = artisan.getUser();
+        notificationService.createForUser(artisanUser, "Your Formateur status has been revoked. Reason: " + dto.getReason(),
+                NotificationType.FORMATEUR_REVOKED, artisanId);
+        emailUtil.sendFormateurRevokedEmail(artisanUser.getEmail(), dto.getReason());
+    }
+
+    /**
+     * Administratively overrides/lifts the cooldown or reapply block on an artisan's latest request record.
+     */
+    @Transactional
+    public FormateurRequestResponseDTO liftCooldown(String artisanId, FormateurCooldownOverrideDTO dto) {
+        Artisan artisan = artisanRepository.findById(artisanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+
+        ArtisanFormateurRequest request = formateurRequestRepository
+                .findFirstByArtisanAndDeletedAtIsNullOrderByCreatedAtDesc(artisan)
+                .orElseThrow(() -> new ResourceNotFoundException("No Formateur request record found for artisan ID: " + artisanId));
+
+        if (dto.getCanReapply() != null) {
+            request.setCanReapply(dto.getCanReapply());
+        }
+        if (dto.getCooldownUntil() != null) {
+            request.setCooldownUntil(dto.getCooldownUntil());
+        } else if (Boolean.TRUE.equals(dto.getCanReapply()) && dto.getCooldownUntil() == null) {
+            request.setCooldownUntil(null);
+        }
+
+        ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
+        return mapToDTO(saved);
+    }
+
+    private FormateurRequestResponseDTO mapToDTO(ArtisanFormateurRequest req) {
+        User user = req.getArtisan() != null ? req.getArtisan().getUser() : null;
+        String artisanName = user != null
+                ? ((user.getFirstName() != null ? user.getFirstName() + " " : "") + (user.getLastName() != null ? user.getLastName() : "")).trim()
+                : null;
+
+        return FormateurRequestResponseDTO.builder()
+                .id(req.getId())
+                .artisanId(req.getArtisan() != null ? req.getArtisan().getId() : null)
+                .artisanName(artisanName)
+                .artisanEmail(user != null ? user.getEmail() : null)
+                .status(req.getStatus())
+                .motivation(req.getMotivation())
+                .adminNote(req.getAdminNote())
+                .canReapply(req.isCanReapply())
+                .cooldownUntil(req.getCooldownUntil())
+                .decidedByAdminId(req.getDecidedBy() != null ? req.getDecidedBy().getId() : null)
+                .decidedByAdminEmail(req.getDecidedBy() != null ? req.getDecidedBy().getEmail() : null)
+                .decidedAt(req.getDecidedAt())
+                .createdAt(req.getCreatedAt())
+                .build();
+    }
+}
