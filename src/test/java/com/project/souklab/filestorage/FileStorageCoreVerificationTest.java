@@ -340,24 +340,23 @@ class FileStorageCoreVerificationTest {
 
         byte[] validHeader = VALID_JPEG_BYTES;
         int oversizedBodyLength = 3 * 1024 * 1024;
-        try (InputStream oversizedStream = new SequenceInputStream(
-                new ByteArrayInputStream(validHeader),
-                new InputStream() {
-                    private int count = 0;
-                    @Override
-                    public int read() {
-                        return count++ < oversizedBodyLength ? 0x20 : -1;
-                    }
-                    @Override
-                    public int read(byte[] b, int off, int len) {
-                        if (count >= oversizedBodyLength) return -1;
-                        int available = Math.min(len, oversizedBodyLength - count);
-                        java.util.Arrays.fill(b, off, off + available, (byte) 0x20);
-                        count += available;
-                        return available;
-                    }
-                }
-        )) {
+        try (InputStream headerStream = new ByteArrayInputStream(validHeader);
+             InputStream bodyStream = new InputStream() {
+                 private int count = 0;
+                 @Override
+                 public int read() {
+                     return count++ < oversizedBodyLength ? 0x20 : -1;
+                 }
+                 @Override
+                 public int read(byte[] b, int off, int len) {
+                     if (count >= oversizedBodyLength) return -1;
+                     int available = Math.min(len, oversizedBodyLength - count);
+                     java.util.Arrays.fill(b, off, off + available, (byte) 0x20);
+                     count += available;
+                     return available;
+                 }
+             };
+             InputStream oversizedStream = new SequenceInputStream(headerStream, bodyStream)) {
             System.out.println("Configured Max Limit: " + configuredMaxBytes + " bytes (2MB)");
             System.out.println("Client Declared Size Header: " + declaredFakeSmallSize + " bytes (Lying small)");
             System.out.println("Actual Stream Payload: ~3.0MB (Exceeds limit)");
