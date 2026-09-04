@@ -29,6 +29,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ArtisanFormateurService {
 
+    private static final String ERROR_ADMIN_NOT_FOUND_PREFIX = "Admin not found: ";
+    private static final String ERROR_ARTISAN_NOT_FOUND_PREFIX = "Artisan not found with id: ";
+
     private final ArtisanFormateurRequestRepository formateurRequestRepository;
     private final ArtisanRepository artisanRepository;
     private final UserRepository userRepository;
@@ -112,7 +115,7 @@ public class ArtisanFormateurService {
     public FormateurRequestResponseDTO approveRequest(String requestId, FormateurApproveDTO dto) {
         String adminEmail = SecurityUtils.getCurrentUsername();
         User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ADMIN_NOT_FOUND_PREFIX + adminEmail));
 
         ArtisanFormateurRequest request = formateurRequestRepository.findByIdAndDeletedAtIsNull(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Formateur request not found with id: " + requestId));
@@ -148,7 +151,7 @@ public class ArtisanFormateurService {
     public FormateurRequestResponseDTO rejectRequest(String requestId, FormateurRejectDTO dto) {
         String adminEmail = SecurityUtils.getCurrentUsername();
         User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ADMIN_NOT_FOUND_PREFIX + adminEmail));
 
         ArtisanFormateurRequest request = formateurRequestRepository.findByIdAndDeletedAtIsNull(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Formateur request not found with id: " + requestId));
@@ -188,10 +191,10 @@ public class ArtisanFormateurService {
     public FormateurRequestResponseDTO grantDirectly(String artisanId, FormateurGrantDTO dto) {
         String adminEmail = SecurityUtils.getCurrentUsername();
         User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ADMIN_NOT_FOUND_PREFIX + adminEmail));
 
         Artisan artisan = artisanRepository.findById(artisanId)
-                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ARTISAN_NOT_FOUND_PREFIX + artisanId));
 
         if (artisan.isTeacher()) {
             throw new BadRequestException("Artisan is already an approved Formateur.");
@@ -229,10 +232,10 @@ public class ArtisanFormateurService {
     public void revokeDirectly(String artisanId, FormateurRevokeDTO dto) {
         String adminEmail = SecurityUtils.getCurrentUsername();
         userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin not found: " + adminEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ADMIN_NOT_FOUND_PREFIX + adminEmail));
 
         Artisan artisan = artisanRepository.findById(artisanId)
-                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ARTISAN_NOT_FOUND_PREFIX + artisanId));
 
         if (!artisan.isTeacher()) {
             throw new BadRequestException("Artisan is not currently an approved Formateur.");
@@ -254,7 +257,7 @@ public class ArtisanFormateurService {
     @Transactional
     public FormateurRequestResponseDTO liftCooldown(String artisanId, FormateurCooldownOverrideDTO dto) {
         Artisan artisan = artisanRepository.findById(artisanId)
-                .orElseThrow(() -> new ResourceNotFoundException("Artisan not found with id: " + artisanId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_ARTISAN_NOT_FOUND_PREFIX + artisanId));
 
         ArtisanFormateurRequest request = formateurRequestRepository
                 .findFirstByArtisanAndDeletedAtIsNullOrderByCreatedAtDesc(artisan)

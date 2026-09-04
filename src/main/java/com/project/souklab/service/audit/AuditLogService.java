@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AuditLogService {
 
+    private static final String ANONYMOUS_USER = "anonymousUser";
+
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
 
@@ -31,7 +33,7 @@ public class AuditLogService {
     @Transactional
     public void logAction(AuditLogAction action, String details) {
         String username = SecurityUtils.getCurrentUsername();
-        String effectiveUsername = (username != null && !username.equals("anonymousUser")) ? username : "anonymousUser";
+        String effectiveUsername = (username != null && !username.equals(ANONYMOUS_USER)) ? username : ANONYMOUS_USER;
         logAction(action, details, effectiveUsername);
     }
 
@@ -50,7 +52,7 @@ public class AuditLogService {
             auditLog.setAction(action);
             auditLog.setDetails(details);
 
-            if (username != null && !username.equals("anonymousUser")) {
+            if (username != null && !username.equals(ANONYMOUS_USER)) {
                 userRepository.findByEmail(username).ifPresent(auditLog::setUser);
             }
 

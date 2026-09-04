@@ -44,6 +44,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final String ROLE_ARTISAN_NAME = "ROLE_ARTISAN";
+    private static final String ROLE_CLIENT_NAME = "ROLE_CLIENT";
+    private static final String ERROR_USER_NOT_FOUND_PREFIX = "User not found: ";
+    private static final String PAYLOAD_KEY_REGION_ID = "regionId";
+    private static final String PAYLOAD_KEY_REGION = "region";
+    private static final String PAYLOAD_KEY_ADDRESS = "address";
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -81,7 +88,7 @@ public class AuthService {
         }
 
         String roleName = roleInput.startsWith("ROLE_") ? roleInput : "ROLE_" + roleInput;
-        if (!roleName.equals("ROLE_ARTISAN") && !roleName.equals("ROLE_CLIENT")) {
+        if (!roleName.equals(ROLE_ARTISAN_NAME) && !roleName.equals(ROLE_CLIENT_NAME)) {
             throw new BadRequestException("Invalid registration role. Allowed roles are ARTISAN or CLIENT.");
         }
 
@@ -96,7 +103,7 @@ public class AuthService {
             lastName = parts.length > 1 ? parts[1] : "";
         }
 
-        boolean isArtisan = roleName.equals("ROLE_ARTISAN");
+        boolean isArtisan = roleName.equals(ROLE_ARTISAN_NAME);
         if (isArtisan) {
             initialStatus = AccountStatus.PENDING;
         }
@@ -204,7 +211,7 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
                 .user(mapToLoginSummary(user))
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                .roles(user.getRoles().stream().map(Role::getName).toList())
                 .build();
     }
 
@@ -233,7 +240,7 @@ public class AuthService {
         }
 
         User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + email));
 
         return mapToProfileResponse(user);
     }
@@ -249,12 +256,12 @@ public class AuthService {
         }
 
         User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + email));
 
         boolean isArtisan = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
+                .anyMatch(r -> r.getName().equals(ROLE_ARTISAN_NAME));
         boolean isClient = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals("ROLE_CLIENT"));
+                .anyMatch(r -> r.getName().equals(ROLE_CLIENT_NAME));
 
         if (isArtisan) {
             Artisan profile = artisanRepository.findById(user.getId())
@@ -301,12 +308,12 @@ public class AuthService {
         }
 
         User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + email));
 
         boolean isArtisan = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
+                .anyMatch(r -> r.getName().equals(ROLE_ARTISAN_NAME));
         boolean isClient = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals("ROLE_CLIENT"));
+                .anyMatch(r -> r.getName().equals(ROLE_CLIENT_NAME));
 
         if (!isArtisan && !isClient) {
             throw new ForbiddenException("Administrators do not possess an editable artisan or client profile.");
@@ -335,16 +342,16 @@ public class AuthService {
             if (payload.has("bio")) {
                 artisan.setBio(payload.get("bio").isNull() ? null : patchDTO.getBio());
             }
-            if (payload.has("regionId")) {
-                artisan.setRegionId(payload.get("regionId").isNull() ? null : patchDTO.getRegionId());
-            } else if (payload.has("region")) {
-                artisan.setRegionId(payload.get("region").isNull() ? null : patchDTO.resolveRegionId());
+            if (payload.has(PAYLOAD_KEY_REGION_ID)) {
+                artisan.setRegionId(payload.get(PAYLOAD_KEY_REGION_ID).isNull() ? null : patchDTO.getRegionId());
+            } else if (payload.has(PAYLOAD_KEY_REGION)) {
+                artisan.setRegionId(payload.get(PAYLOAD_KEY_REGION).isNull() ? null : patchDTO.resolveRegionId());
             }
             if (payload.has("city")) {
                 artisan.setCity(payload.get("city").isNull() ? null : patchDTO.getCity());
             }
-            if (payload.has("address")) {
-                artisan.setAddress(payload.get("address").isNull() ? null : patchDTO.getAddress());
+            if (payload.has(PAYLOAD_KEY_ADDRESS)) {
+                artisan.setAddress(payload.get(PAYLOAD_KEY_ADDRESS).isNull() ? null : patchDTO.getAddress());
             }
             if (payload.has("website")) {
                 artisan.setWebsite(payload.get("website").isNull() ? null : patchDTO.getWebsite());
@@ -374,13 +381,13 @@ public class AuthService {
             if (payload.has("bio")) {
                 client.setBio(payload.get("bio").isNull() ? null : patchDTO.getBio());
             }
-            if (payload.has("address")) {
-                client.setAddress(payload.get("address").isNull() ? null : patchDTO.getAddress());
+            if (payload.has(PAYLOAD_KEY_ADDRESS)) {
+                client.setAddress(payload.get(PAYLOAD_KEY_ADDRESS).isNull() ? null : patchDTO.getAddress());
             }
-            if (payload.has("regionId")) {
-                client.setRegionId(payload.get("regionId").isNull() ? null : patchDTO.getRegionId());
-            } else if (payload.has("region")) {
-                client.setRegionId(payload.get("region").isNull() ? null : patchDTO.resolveRegionId());
+            if (payload.has(PAYLOAD_KEY_REGION_ID)) {
+                client.setRegionId(payload.get(PAYLOAD_KEY_REGION_ID).isNull() ? null : patchDTO.getRegionId());
+            } else if (payload.has(PAYLOAD_KEY_REGION)) {
+                client.setRegionId(payload.get(PAYLOAD_KEY_REGION).isNull() ? null : patchDTO.resolveRegionId());
             }
             if (payload.has("city")) {
                 client.setCity(payload.get("city").isNull() ? null : patchDTO.getCity());
@@ -448,10 +455,10 @@ public class AuthService {
                 String roleName;
                 AccountStatus initialStatus;
                 if (normalizedIntent.contains("ARTISAN")) {
-                    roleName = "ROLE_ARTISAN";
+                    roleName = ROLE_ARTISAN_NAME;
                     initialStatus = AccountStatus.PENDING;
                 } else if (normalizedIntent.contains("CLIENT")) {
-                    roleName = "ROLE_CLIENT";
+                    roleName = ROLE_CLIENT_NAME;
                     initialStatus = AccountStatus.ACTIVE;
                 } else {
                     throw new BadRequestException("Invalid OAuth registration role intent: " + intentRole);
@@ -503,7 +510,7 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(appProperties.getJwt().getAccessTokenExpirationMs() / 1000)
                 .user(mapToLoginSummary(user))
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                .roles(user.getRoles().stream().map(Role::getName).toList())
                 .build();
     }
 
@@ -524,7 +531,7 @@ public class AuthService {
      */
     public ProfileResponse mapToProfileResponse(User user) {
         boolean isArtisan = user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals("ROLE_ARTISAN"));
+                .anyMatch(r -> r.getName().equals(ROLE_ARTISAN_NAME));
 
         Set<String> roleNames = user.getRoles().stream()
                 .map(Role::getName)
@@ -593,7 +600,7 @@ public class AuthService {
         String primaryRole = user.getRoles().stream()
                 .findFirst()
                 .map(Role::getName)
-                .orElse("ROLE_CLIENT");
+                .orElse(ROLE_CLIENT_NAME);
 
         boolean isTeacher = user.getArtisan() != null && user.getArtisan().isTeacher();
         boolean isPremium = (user.getArtisan() != null && user.getArtisan().isPremium())
@@ -719,7 +726,7 @@ public class AuthService {
         }
 
         User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + email));
 
         if (user.getPassword() == null || user.getPassword().isBlank()) {
             throw new BadRequestException("This account was created via social login and does not have a password to change. Please continue signing in with Google.");

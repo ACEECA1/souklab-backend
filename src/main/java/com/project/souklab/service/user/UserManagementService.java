@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserManagementService {
 
+    private static final String ERROR_USER_NOT_FOUND_PREFIX = "User not found with id: ";
+
     private final UserRepository userRepository;
     private final ArtisanRepository artisanRepository;
     private final AuditLogService auditLogService;
@@ -77,7 +79,7 @@ public class UserManagementService {
     @Transactional
     public void approveUser(String userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + userId));
 
         if (user.getStatus() != AccountStatus.PENDING) {
             throw new BadRequestException("User is not pending approval. Current status: " + user.getStatus());
@@ -107,7 +109,7 @@ public class UserManagementService {
     @Transactional
     public void banUser(String userId, String reason) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + userId));
 
         user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason != null ? reason : "Account banned by administrator");
@@ -138,7 +140,7 @@ public class UserManagementService {
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException(ERROR_USER_NOT_FOUND_PREFIX + userId));
 
         user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason != null ? reason : "Account timed out by administrator");

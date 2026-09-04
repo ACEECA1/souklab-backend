@@ -6,6 +6,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 public class SecurityUtils {
 
+    private SecurityUtils() {
+        // Utility class
+    }
+
     public static String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -13,14 +17,14 @@ public class SecurityUtils {
         }
         
         Object principal = authentication.getPrincipal();
-        if (principal instanceof UserDetails) {
-            return ((UserDetails) principal).getUsername();
+        if (principal instanceof UserDetails userDetails) {
+            return userDetails.getUsername();
         }
-        if (principal instanceof String) {
-            if ("anonymousUser".equals(principal)) {
+        if (principal instanceof String principalString) {
+            if ("anonymousUser".equals(principalString)) {
                 return null;
             }
-            return (String) principal;
+            return principalString;
         }
         
         String name = authentication.getName();

@@ -21,6 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EmailUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(EmailUtil.class);
+    private static final String ADMINISTRATOR_NOTE_HEADER = "Administrator Note:\n";
 
     private final JavaMailSender mailSender;
     private final AppProperties appProperties;
@@ -168,7 +169,7 @@ public class EmailUtil {
                 "<blockquote>" + adminNote + "</blockquote>" +
                 "<p>You may now create and publish masterclasses and workshops on the platform.</p>";
         String textContent = "Congratulations!\n\nYour request to become an official Formateur on Souklab has been approved.\n\n" +
-                "Administrator Note:\n" + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
+                ADMINISTRATOR_NOTE_HEADER + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
         sendEmail(toEmail, subject, textContent, htmlContent);
     }
 
@@ -181,7 +182,7 @@ public class EmailUtil {
                 "<blockquote>" + adminNote + "</blockquote>" +
                 "<p>You may now create and publish masterclasses and workshops on the platform.</p>";
         String textContent = "Hello,\n\nYou have been granted official Formateur status on Souklab by an administrator.\n\n" +
-                "Administrator Note:\n" + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
+                ADMINISTRATOR_NOTE_HEADER + adminNote + "\n\nYou may now create and publish masterclasses and workshops on the platform.";
         sendEmail(toEmail, subject, textContent, htmlContent);
     }
 
@@ -197,7 +198,7 @@ public class EmailUtil {
                 "<blockquote>" + adminNote + "</blockquote>" +
                 "<p>" + reapplyMessage + "</p>";
         String textContent = "Hello,\n\nYour request to become a Formateur on Souklab was not approved at this time.\n\n" +
-                "Administrator Note:\n" + adminNote + "\n\n" + reapplyMessage;
+                ADMINISTRATOR_NOTE_HEADER + adminNote + "\n\n" + reapplyMessage;
         sendEmail(toEmail, subject, textContent, htmlContent);
     }
 

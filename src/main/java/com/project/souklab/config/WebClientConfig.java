@@ -1,18 +1,11 @@
 package com.project.souklab.config;
 
-// TODO Phase 9: re-enable, requires spring-boot-starter-webflux for Chargily Pay V2 integration
-/*
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.reactive.function.client.WebClient;
-
-@Configuration
+/**
+ * TODO Phase 9: re-enable, requires spring-boot-starter-webflux for Chargily Pay V2 integration.
+ */
 public class WebClientConfig {
-    @Bean
-    public WebClient webClient(WebClient.Builder builder) {
-        return builder.build();
+
+    private WebClientConfig() {
+        // Placeholder configuration class pending Phase 9 Chargily Pay V2 integration
     }
 }
-*/
-
-

@@ -24,6 +24,8 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
+    public static final String OAUTH_INTENT_COOKIE_NAME = "SOUKLAB_OAUTH_INTENT";
+
     @Lazy
     private final AuthService authService;
     private final ServletResponseUtil servletResponseUtil;
@@ -49,21 +51,21 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private String extractIntentRole(HttpServletRequest request) {
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
-                if ("SOUKLAB_OAUTH_INTENT".equals(cookie.getName())) {
+                if (OAUTH_INTENT_COOKIE_NAME.equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }
         }
-        String sessionRole = (String) request.getSession().getAttribute("SOUKLAB_OAUTH_INTENT");
+        String sessionRole = (String) request.getSession().getAttribute(OAUTH_INTENT_COOKIE_NAME);
         if (sessionRole != null) {
-            request.getSession().removeAttribute("SOUKLAB_OAUTH_INTENT");
+            request.getSession().removeAttribute(OAUTH_INTENT_COOKIE_NAME);
             return sessionRole;
         }
         return null;
     }
 
     private void clearIntentCookie(HttpServletResponse response) {
-        ResponseCookie clearCookie = ResponseCookie.from("SOUKLAB_OAUTH_INTENT", "")
+        ResponseCookie clearCookie = ResponseCookie.from(OAUTH_INTENT_COOKIE_NAME, "")
                 .path("/")
                 .httpOnly(true)
                 .sameSite("Lax")

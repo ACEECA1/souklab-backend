@@ -23,6 +23,7 @@ public final class CodeGeneratorUtil {
         }
         int bound = (int) Math.pow(10, digits);
         int number = SECURE_RANDOM.nextInt(bound);
-        return String.format("%0" + digits + "d", number);
+        String format = "%0" + digits + "d";
+        return String.format(format, number);
     }
 }
