@@ -1,6 +1,6 @@
 package com.project.souklab.util;
 
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.project.souklab.dto.common.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ServletResponseUtil {
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     public void writeResponse(HttpServletResponse response, int status, ApiResponse<?> apiResponse) throws IOException {
         apiResponse.setCode(status);

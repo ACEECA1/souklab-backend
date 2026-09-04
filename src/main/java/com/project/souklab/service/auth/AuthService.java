@@ -1,7 +1,7 @@
 package com.project.souklab.service.auth;
 
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.project.souklab.config.AppProperties;
 import com.project.souklab.dao.*;
 import com.project.souklab.dto.auth.*;
@@ -36,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -59,7 +58,7 @@ public class AuthService {
     private final VerificationTokenService verificationTokenService;
     private final EmailUtil emailUtil;
     private final AuditLogService auditLogService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final Validator validator;
 
     /**
@@ -614,43 +613,6 @@ public class AuthService {
                 .isPremium(isPremium)
                 .isValidated(isValidated)
                 .isTeacher(isTeacher)
-                .build();
-    }
-
-    /** @deprecated Use mapToProfileResponse(User) for auth endpoints. Kept for admin services. */
-    public UserResponseDTO mapToDTO(User user) {
-        String primaryRole = user.getRoles().stream()
-                .findFirst()
-                .map(Role::getName)
-                .orElse("ROLE_CLIENT");
-
-        boolean isTeacher = user.getArtisan() != null && user.getArtisan().isTeacher();
-        boolean isPremium = (user.getArtisan() != null && user.getArtisan().isPremium())
-                || (user.getClient() != null && user.getClient().isPremium());
-        boolean isValidated = (user.getArtisan() != null && user.getArtisan().isVerified())
-                || (user.getClient() != null && user.getClient().isVerified());
-
-        return UserResponseDTO.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .name(user.getName())
-                .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
-                .status(user.getStatus())
-                .emailVerified(user.isEmailVerified())
-                .emailVerifiedAt(user.getEmailVerifiedAt())
-                .primaryRole(primaryRole)
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .isPremium(isPremium)
-                .isValidated(isValidated)
-                .isTeacher(isTeacher)
-                .bannedUntil(user.getBannedUntil())
-                .banReason(user.getBanReason())
-                .lastLoginAt(user.getLastLoginAt())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 

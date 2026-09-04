@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
             fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage() != null ? error.getDefaultMessage() : "is invalid");
         }
         log.debug("MethodArgumentNotValidException: {}", fieldErrors);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
                 .body(ApiResponse.validationError(fieldErrors));
     }
 
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
             fieldErrors.putIfAbsent(violation.getPropertyPath().toString(), violation.getMessage());
         }
         log.debug("ConstraintViolationException: {}", fieldErrors);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
                 .body(ApiResponse.validationError(fieldErrors));
     }
 
@@ -152,12 +152,12 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles file uploads exceeding maximum allowed size (413 Payload Too Large).
+     * Handles file uploads exceeding maximum allowed size (413 Content Too Large).
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
         log.warn("MaxUploadSizeExceededException: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
                 .body(ApiResponse.error("Maximum upload size exceeded."));
     }
 
