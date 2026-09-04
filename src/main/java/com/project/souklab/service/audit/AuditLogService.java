@@ -23,14 +23,13 @@ public class AuditLogService {
 
     /**
      * Records an audit log entry for a specific action performed by a user.
-     * If the current user is authenticated, their username is attached to the log.
-     * Otherwise, the action is logged under 'anonymousUser'.
+     * Resolves the authenticated user's username on the calling thread before
+     * delegating to the persistence worker. If no user is authenticated,
+     * the action is logged under 'anonymousUser'.
      *
      * @param action the {@link AuditLogAction} representing the action type
      * @param details a detailed description of the action and its context
      */
-    @Async("applicationTaskExecutor")
-    @Transactional
     public void logAction(AuditLogAction action, String details) {
         String username = SecurityUtils.getCurrentUsername();
         String effectiveUsername = (username != null && !username.equals(ANONYMOUS_USER)) ? username : ANONYMOUS_USER;
