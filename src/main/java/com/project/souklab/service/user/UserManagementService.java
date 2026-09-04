@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ public class UserManagementService {
     private final AuditLogService auditLogService;
     private final RefreshTokenService refreshTokenService;
     private final NotificationService notificationService;
+    private final Clock clock;
 
     /**
      * Retrieves a paginated list of all users in the system.
@@ -113,7 +115,7 @@ public class UserManagementService {
 
         user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason != null ? reason : "Account banned by administrator");
-        user.setBannedUntil(LocalDateTime.now().plusYears(100)); // Indefinite ban
+        user.setBannedUntil(LocalDateTime.now(clock).plusYears(100)); // Indefinite ban
         userRepository.save(user);
 
         // Invalidate tokens for security
@@ -144,7 +146,7 @@ public class UserManagementService {
 
         user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason != null ? reason : "Account timed out by administrator");
-        user.setBannedUntil(LocalDateTime.now().plusMinutes(minutes));
+        user.setBannedUntil(LocalDateTime.now(clock).plusMinutes(minutes));
         userRepository.save(user);
 
         // Invalidate tokens for security

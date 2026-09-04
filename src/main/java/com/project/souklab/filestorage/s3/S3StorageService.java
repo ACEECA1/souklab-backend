@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.InputStream;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -43,11 +44,21 @@ import java.util.UUID;
  * and memory defenses strictly depend on this invariant being respected.
  */
 @Slf4j
-@RequiredArgsConstructor
 public class S3StorageService implements StorageService {
 
     private final StorageProperties properties;
     private final S3Client s3Client;
+    private final Clock clock;
+
+    public S3StorageService(StorageProperties properties, S3Client s3Client) {
+        this(properties, s3Client, Clock.systemUTC());
+    }
+
+    public S3StorageService(StorageProperties properties, S3Client s3Client, Clock clock) {
+        this.properties = properties;
+        this.s3Client = s3Client;
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
 
     /**
      * Initializes the target S3 bucket on startup if auto-creation is enabled.
@@ -107,7 +118,7 @@ public class S3StorageService implements StorageService {
             s3Client.putObject(putRequest, RequestBody.fromInputStream(content, size));
             log.debug("Stored file in S3 via direct stream [bucket={}, key={}, size={} bytes]", bucket, key, size);
 
-            return new StorageResult(key, originalFilename, contentType, size, Instant.now());
+            return new StorageResult(key, originalFilename, contentType, size, Instant.now(clock));
         } catch (FileTooLargeException e) {
             throw e;
         } catch (AwsServiceException | SdkClientException e) {

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final AppProperties appProperties;
+    private final Clock clock;
 
     @Transactional
     public RefreshToken createRefreshToken(String userId) {
@@ -37,7 +39,7 @@ public class RefreshTokenService {
                 .orElse(RefreshToken.builder().user(user).build());
 
         refreshToken.setUser(user);
-        refreshToken.setExpiryDate(Instant.now().plusMillis(appProperties.getJwt().getRefreshTokenExpirationMs()));
+        refreshToken.setExpiryDate(Instant.now(clock).plusMillis(appProperties.getJwt().getRefreshTokenExpirationMs()));
         refreshToken.setToken(UUID.randomUUID().toString());
 
         return refreshTokenRepository.save(refreshToken);
@@ -53,14 +55,14 @@ public class RefreshTokenService {
         RefreshToken newToken = RefreshToken.builder()
                 .user(user)
                 .token(UUID.randomUUID().toString())
-                .expiryDate(Instant.now().plusMillis(appProperties.getJwt().getRefreshTokenExpirationMs()))
+                .expiryDate(Instant.now(clock).plusMillis(appProperties.getJwt().getRefreshTokenExpirationMs()))
                 .build();
 
         return refreshTokenRepository.save(newToken);
     }
 
     public RefreshToken verifyExpiration(RefreshToken token) {
-        if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
+        if (token.getExpiryDate().compareTo(Instant.now(clock)) < 0) {
             refreshTokenRepository.delete(token);
             throw new UnauthorizedException("Refresh token has expired. Please sign in again.");
         }

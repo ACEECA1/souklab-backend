@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final Clock clock;
 
     /**
      * Creates a new notification for a specific user and sends it over WebSocket.
@@ -103,7 +105,7 @@ public class NotificationService {
             notification = opt.get();
             notification.setMessage(message);
             notification.setRead(false);
-            notification.setCreatedAt(LocalDateTime.now());
+            notification.setCreatedAt(LocalDateTime.now(clock));
         } else {
             notification = new Notification();
             notification.setUser(user);
@@ -198,7 +200,7 @@ public class NotificationService {
         User user = getCurrentUser();
         Notification notification = notificationRepository.findByIdAndUserAndDeletedAtIsNull(notificationId, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
-        notification.setDeletedAt(LocalDateTime.now());
+        notification.setDeletedAt(LocalDateTime.now(clock));
         notificationRepository.save(notification);
     }
 

@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -29,6 +30,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryStorageService implements StorageService {
 
     private final Map<String, StoredFile> store = new ConcurrentHashMap<>();
+    private final Clock clock;
+
+    public InMemoryStorageService() {
+        this(Clock.systemUTC());
+    }
+
+    public InMemoryStorageService(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
 
     /**
      * In-memory file representation.
@@ -74,7 +84,7 @@ public class InMemoryStorageService implements StorageService {
         String extension = extractExtension(originalFilename);
         String key = UUID.randomUUID().toString() + (extension.isEmpty() ? "" : "." + extension);
 
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         store.put(key, new StoredFile(bytes, originalFilename, contentType, now));
         log.debug("Stored file in-memory with key '{}' (size: {} bytes, original: '{}')", key, bytes.length, originalFilename);
 

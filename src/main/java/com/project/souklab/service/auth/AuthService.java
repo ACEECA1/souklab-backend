@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -67,6 +68,7 @@ public class AuthService {
     private final AuditLogService auditLogService;
     private final JsonMapper objectMapper;
     private final Validator validator;
+    private final Clock clock;
 
     /**
      * Registers a new user.
@@ -158,7 +160,7 @@ public class AuthService {
             throw new UnauthorizedException("This account was created via social login. Please sign in with Google.");
         }
 
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now(clock))) {
             throw new BadRequestException("Too many failed login attempts. Account is temporarily locked. Please try again later.");
         }
 
@@ -166,14 +168,14 @@ public class AuthService {
             int attempts = user.getFailedLoginAttempts() + 1;
             user.setFailedLoginAttempts(attempts);
             if (attempts >= 5) {
-                user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+                user.setLockedUntil(LocalDateTime.now(clock).plusMinutes(15));
             }
             userRepository.save(user);
             throw new UnauthorizedException("Invalid email or password.");
         }
 
         if (user.getStatus() == AccountStatus.SUSPENDED 
-                || (user.getBannedUntil() != null && user.getBannedUntil().isAfter(LocalDateTime.now()))) {
+                || (user.getBannedUntil() != null && user.getBannedUntil().isAfter(LocalDateTime.now(clock)))) {
             throw new ForbiddenException("Account is suspended: " + (user.getBanReason() != null ? user.getBanReason() : "Please contact support."));
         }
 
@@ -183,7 +185,7 @@ public class AuthService {
 
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
-        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginAt(LocalDateTime.now(clock));
         if (request != null) {
             user.setLastLoginIp(extractClientIp(request));
         }
@@ -475,7 +477,7 @@ public class AuthService {
                         .avatarUrl(picture)
                         .status(initialStatus)
                         .emailVerified(true)
-                        .emailVerifiedAt(LocalDateTime.now())
+                        .emailVerifiedAt(LocalDateTime.now(clock))
                         .roles(new HashSet<>(Set.of(role)))
                         .build();
 
@@ -491,7 +493,7 @@ public class AuthService {
             }
         }
 
-        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginAt(LocalDateTime.now(clock));
         if (request != null) {
             user.setLastLoginIp(extractClientIp(request));
         }
@@ -635,7 +637,7 @@ public class AuthService {
         verificationTokenService.validateAndConsume(user, VerificationTokenType.EMAIL_VERIFICATION, dto.getCode());
 
         user.setEmailVerified(true);
-        user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerifiedAt(LocalDateTime.now(clock));
         userRepository.save(user);
 
         auditLogService.logAction(AuditLogAction.EMAIL_VERIFIED, "Email verified for user: " + user.getEmail(), user.getEmail());

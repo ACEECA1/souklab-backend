@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Service
@@ -26,6 +27,7 @@ public class VerificationTokenService {
     private static final int CODE_EXPIRATION_MINUTES = 15;
 
     private final VerificationTokenRepository verificationTokenRepository;
+    private final Clock clock;
 
     /**
      * Issues a new 6-digit numeric verification code for the specified user and token type.
@@ -38,7 +40,7 @@ public class VerificationTokenService {
      */
     @Transactional
     public String issueToken(User user, VerificationTokenType type) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         // Invalidate any existing active tokens for this user and type
         verificationTokenRepository.invalidateActiveTokens(user, type, now);
@@ -72,7 +74,7 @@ public class VerificationTokenService {
      */
     @Transactional(noRollbackFor = BadRequestException.class)
     public void validateAndConsume(User user, VerificationTokenType type, String submittedCode) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         VerificationToken token = verificationTokenRepository.findActiveToken(user, type, now)
                 .orElseThrow(() -> {

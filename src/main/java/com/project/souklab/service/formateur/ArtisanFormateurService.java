@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,7 @@ public class ArtisanFormateurService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final EmailUtil emailUtil;
+    private final Clock clock;
 
     /**
      * Submits a new formateur status request for the authenticated artisan.
@@ -69,7 +71,7 @@ public class ArtisanFormateurService {
             if (!latest.isCanReapply()) {
                 throw new ForbiddenException("You are permanently blocked from submitting new Formateur requests.");
             }
-            if (latest.getCooldownUntil() != null && latest.getCooldownUntil().isAfter(LocalDateTime.now())) {
+            if (latest.getCooldownUntil() != null && latest.getCooldownUntil().isAfter(LocalDateTime.now(clock))) {
                 throw new ForbiddenException("You cannot submit a request during the cooldown period. Cooldown expires on: " + latest.getCooldownUntil());
             }
         }
@@ -127,7 +129,7 @@ public class ArtisanFormateurService {
         request.setStatus(FormateurRequestStatus.APPROVED);
         request.setAdminNote(dto.getAdminNote());
         request.setDecidedBy(admin);
-        request.setDecidedAt(LocalDateTime.now());
+        request.setDecidedAt(LocalDateTime.now(clock));
 
         Artisan artisan = request.getArtisan();
         artisan.setTeacher(true);
@@ -163,7 +165,7 @@ public class ArtisanFormateurService {
         boolean canReapply = dto.getCanReapply() == null || dto.getCanReapply();
         LocalDateTime cooldownUntil = null;
         if (canReapply) {
-            cooldownUntil = dto.getCooldownUntil() != null ? dto.getCooldownUntil() : LocalDateTime.now().plusDays(14);
+            cooldownUntil = dto.getCooldownUntil() != null ? dto.getCooldownUntil() : LocalDateTime.now(clock).plusDays(14);
         }
 
         request.setStatus(FormateurRequestStatus.REJECTED);
@@ -171,7 +173,7 @@ public class ArtisanFormateurService {
         request.setCanReapply(canReapply);
         request.setCooldownUntil(cooldownUntil);
         request.setDecidedBy(admin);
-        request.setDecidedAt(LocalDateTime.now());
+        request.setDecidedAt(LocalDateTime.now(clock));
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
 
@@ -211,7 +213,7 @@ public class ArtisanFormateurService {
                 .canReapply(true)
                 .cooldownUntil(null)
                 .decidedBy(admin)
-                .decidedAt(LocalDateTime.now())
+                .decidedAt(LocalDateTime.now(clock))
                 .build();
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(auditRecord);

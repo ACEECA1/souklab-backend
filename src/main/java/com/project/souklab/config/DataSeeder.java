@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +29,7 @@ public class DataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
     private final EmailUtil emailUtil;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -74,7 +76,7 @@ public class DataSeeder implements CommandLineRunner {
                 .lastName("Administrator")
                 .status(AccountStatus.ACTIVE)
                 .emailVerified(true)
-                .emailVerifiedAt(LocalDateTime.now())
+                .emailVerifiedAt(LocalDateTime.now(clock))
                 .roles(new HashSet<>(Set.of(adminRole)))
                 .build();
 
