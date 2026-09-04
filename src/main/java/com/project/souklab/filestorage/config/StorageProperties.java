@@ -39,7 +39,8 @@ public class StorageProperties {
         private DataSize maxFileSize;
 
         /**
-         * List of allowed MIME types.
+         * List of allowed MIME types. Note: WebP was deliberately excluded because no pure-Java ImageIO
+         * writer exists, and native JNI options were rejected due to portability and container-compatibility concerns.
          */
         private List<String> allowedMimeTypes;
     }

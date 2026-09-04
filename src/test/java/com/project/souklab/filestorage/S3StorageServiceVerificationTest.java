@@ -65,7 +65,7 @@ class S3StorageServiceVerificationTest {
             .withUserConfiguration(StorageConfiguration.class)
             .withPropertyValues(
                     "storage.validation.max-file-size=2MB",
-                    "storage.validation.allowed-mime-types=image/jpeg,image/png,image/webp,application/pdf"
+                    "storage.validation.allowed-mime-types=image/jpeg,image/png,application/pdf"
             );
 
     /**
@@ -87,7 +87,6 @@ class S3StorageServiceVerificationTest {
         properties.getValidation().setAllowedMimeTypes(List.of(
                 "image/jpeg",
                 "image/png",
-                "image/webp",
                 "application/pdf"
         ));
 

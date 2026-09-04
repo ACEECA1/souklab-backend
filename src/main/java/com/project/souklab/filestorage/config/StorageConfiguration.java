@@ -1,6 +1,8 @@
 package com.project.souklab.filestorage.config;
 
 import com.project.souklab.filestorage.StorageService;
+import com.project.souklab.filestorage.image.ImageProcessingService;
+import com.project.souklab.filestorage.image.ThumbnailatorImageProcessingService;
 import com.project.souklab.filestorage.s3.S3StorageService;
 import com.project.souklab.filestorage.stub.InMemoryStorageService;
 import com.project.souklab.filestorage.validation.FileValidator;
@@ -135,5 +137,16 @@ public class StorageConfiguration {
     public StorageService s3StorageService(StorageProperties properties, S3Client s3Client, ObjectProvider<Clock> clockProvider) {
         Clock clock = clockProvider.getIfAvailable(Clock::systemUTC);
         return new S3StorageService(properties, s3Client, clock);
+    }
+
+    /**
+     * Registers the default image processing service bean using Thumbnailator.
+     *
+     * @return an ImageProcessingService bean
+     */
+    @Bean
+    @ConditionalOnMissingBean(ImageProcessingService.class)
+    public ImageProcessingService imageProcessingService() {
+        return new ThumbnailatorImageProcessingService();
     }
 }

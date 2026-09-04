@@ -64,7 +64,6 @@ class FileStorageCoreVerificationTest {
         properties.getValidation().setAllowedMimeTypes(List.of(
                 "image/jpeg",
                 "image/png",
-                "image/webp",
                 "application/pdf"
         ));
         tika = new Tika();

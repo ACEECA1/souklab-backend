@@ -36,8 +36,8 @@ class SouklabApplicationTests {
         }
         assertThat(mimeTypes)
                 .isNotNull()
-                .hasSize(4)
-                .containsExactly("image/jpeg", "image/png", "image/webp", "application/pdf");
+                .hasSize(3)
+                .containsExactly("image/jpeg", "image/png", "application/pdf");
     }
 
 }
