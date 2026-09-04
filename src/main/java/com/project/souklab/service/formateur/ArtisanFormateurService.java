@@ -270,7 +270,7 @@ public class ArtisanFormateurService {
         }
         if (dto.getCooldownUntil() != null) {
             request.setCooldownUntil(dto.getCooldownUntil());
-        } else if (Boolean.TRUE.equals(dto.getCanReapply()) && dto.getCooldownUntil() == null) {
+        } else if (Boolean.TRUE.equals(dto.getCanReapply())) {
             request.setCooldownUntil(null);
         }
 
