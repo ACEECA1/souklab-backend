@@ -9,7 +9,6 @@ import com.project.souklab.filestorage.exception.FileTooLargeException;
 import com.project.souklab.filestorage.exception.StorageException;
 import com.project.souklab.filestorage.validation.SizeLimitingInputStream;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.ResponseInputStream;
