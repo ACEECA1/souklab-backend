@@ -15,11 +15,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,6 +48,9 @@ class ArtisanFormateurServiceNotificationTest {
 
     @Mock
     private EmailUtil emailUtil;
+
+    @Spy
+    private Clock clock = Clock.systemUTC();
 
     @InjectMocks
     private ArtisanFormateurService artisanFormateurService;
