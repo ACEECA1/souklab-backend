@@ -145,15 +145,16 @@ public class EmailUtil {
     }
 
     @Async("applicationTaskExecutor")
-    public void sendFormateurRequestSubmittedNoticeToAdmin(String adminEmail, String artisanEmail, String motivation) {
+    public void sendFormateurRequestSubmittedNoticeToAdmin(String adminEmail, String artisanEmail, String artisanName, String motivation) {
         String subject = "New Formateur Request Submitted";
         String motivationText = (motivation != null && !motivation.isBlank()) ? motivation : "No motivation message provided.";
+        String displayName = (artisanName != null && !artisanName.isBlank()) ? artisanName + " (" + artisanEmail + ")" : artisanEmail;
         String htmlContent = "<p>Hello Admin,</p>" +
-                "<p>Artisan <strong>" + artisanEmail + "</strong> has submitted a request to become a Formateur.</p>" +
+                "<p>Artisan <strong>" + displayName + "</strong> has submitted a request to become a Formateur.</p>" +
                 "<p><strong>Motivation:</strong></p>" +
                 "<blockquote>" + motivationText + "</blockquote>" +
                 "<p>Please review the request in the administrator dashboard.</p>";
-        String textContent = "Hello Admin,\n\nArtisan " + artisanEmail + " has submitted a request to become a Formateur.\n\n" +
+        String textContent = "Hello Admin,\n\nArtisan " + displayName + " has submitted a request to become a Formateur.\n\n" +
                 "Motivation:\n" + motivationText + "\n\nPlease review the request in the administrator dashboard.";
         sendEmail(adminEmail, subject, textContent, htmlContent);
     }

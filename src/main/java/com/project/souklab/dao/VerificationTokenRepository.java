@@ -7,12 +7,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-@Repository
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, String> {
 
     @Query("SELECT v FROM VerificationToken v WHERE v.user = :user AND v.type = :type AND v.usedAt IS NULL AND v.expiresAt > :now ORDER BY v.createdAt DESC")

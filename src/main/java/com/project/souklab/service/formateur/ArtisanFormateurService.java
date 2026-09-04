@@ -37,6 +37,7 @@ public class ArtisanFormateurService {
 
     /**
      * Submits a new formateur status request for the authenticated artisan.
+     * Dual-dispatch to all admins: in-app + email.
      */
     @Transactional
     public FormateurRequestResponseDTO submitRequest(FormateurRequestDTO dto) {
@@ -80,14 +81,15 @@ public class ArtisanFormateurService {
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
 
-        // Dual-dispatch to all admins: in-app + email
         List<User> admins = userRepository.findByRoleName("ROLE_ADMIN");
-        String artisanName = (user.getFirstName() != null ? user.getFirstName() + " " : "") + (user.getLastName() != null ? user.getLastName() : "");
-        String notifMsg = "New artisan formateur request submitted by " + user.getEmail()
-                + (dto != null && dto.getMotivation() != null && !dto.getMotivation().isBlank() ? ": \"" + dto.getMotivation() + "\"" : "");
+        String artisanName = ((user.getFirstName() != null ? user.getFirstName() + " " : "") + (user.getLastName() != null ? user.getLastName() : "")).trim();
+        String notifMsg = "New artisan formateur request submitted by "
+                + (!artisanName.isBlank() ? artisanName + " (" + user.getEmail() + ")" : user.getEmail())
+                + (dto != null && dto.getMotivation() != null && !dto.getMotivation().isBlank()
+                        ? ": \"" + dto.getMotivation() + "\"" : "");
         for (User admin : admins) {
             notificationService.createForUser(admin, notifMsg, NotificationType.FORMATEUR_REQUEST_SUBMITTED, saved.getId());
-            emailUtil.sendFormateurRequestSubmittedNoticeToAdmin(admin.getEmail(), user.getEmail(), dto != null ? dto.getMotivation() : null);
+            emailUtil.sendFormateurRequestSubmittedNoticeToAdmin(admin.getEmail(), user.getEmail(), artisanName, dto != null ? dto.getMotivation() : null);
         }
 
         return mapToDTO(saved);
@@ -155,7 +157,7 @@ public class ArtisanFormateurService {
             throw new BadRequestException("Request is already " + request.getStatus() + ".");
         }
 
-        boolean canReapply = dto.getCanReapply() != null ? dto.getCanReapply() : true;
+        boolean canReapply = dto.getCanReapply() == null || dto.getCanReapply();
         LocalDateTime cooldownUntil = null;
         if (canReapply) {
             cooldownUntil = dto.getCooldownUntil() != null ? dto.getCooldownUntil() : LocalDateTime.now().plusDays(14);

@@ -7,7 +7,6 @@ import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.exception.BadRequestException;
 import com.project.souklab.exception.ResourceNotFoundException;
 import com.project.souklab.model.AccountStatus;
-import com.project.souklab.model.Artisan;
 import com.project.souklab.model.AuditLogAction;
 import com.project.souklab.model.NotificationType;
 import com.project.souklab.model.Role;
