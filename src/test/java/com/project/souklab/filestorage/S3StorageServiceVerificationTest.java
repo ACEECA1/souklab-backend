@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -60,7 +61,11 @@ class S3StorageServiceVerificationTest {
     private FileValidator validator;
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(StorageConfiguration.class);
+            .withUserConfiguration(StorageConfiguration.class)
+            .withPropertyValues(
+                    "storage.validation.max-file-size=2MB",
+                    "storage.validation.allowed-mime-types=image/jpeg,image/png,image/webp,application/pdf"
+            );
 
     /**
      * Initializes MinIO client fixtures and explicitly configures all StorageProperties
@@ -157,7 +162,10 @@ class S3StorageServiceVerificationTest {
         );
 
         StorageResource retrieved = s3StorageService.retrieve(stored.key());
-        byte[] downloadedBytes = retrieved.content().readAllBytes();
+        byte[] downloadedBytes;
+        try (InputStream stream = retrieved.content()) {
+            downloadedBytes = stream.readAllBytes();
+        }
 
         System.out.println("Retrieved Storage Key: " + retrieved.key());
         System.out.println("Retrieved Content-Type: " + retrieved.contentType());
@@ -383,5 +391,74 @@ class S3StorageServiceVerificationTest {
             System.out.println("Proof: Context failed to start with exact message: "
                     + context.getStartupFailure().getCause().getMessage());
         });
+    }
+
+    /**
+     * Verifies fail-fast startup behavior when storage.provider=s3 is active but bucket is blank or missing.
+     */
+    @Test
+    @DisplayName("Fail-fast: storage.provider=s3 fails fast at startup if bucket is blank or missing")
+    void testFailFast_whenS3BucketMissingOrBlank() {
+        System.out.println("=== FAIL-FAST BUCKET CHECK EVIDENCE ===");
+        contextRunner.withPropertyValues(
+                "storage.provider=s3",
+                "storage.s3.endpoint=http://localhost:9000",
+                "storage.s3.region=us-east-1",
+                "storage.s3.access-key=minioadmin",
+                "storage.s3.secret-key=minioadmin_secret"
+        ).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .hasRootCauseInstanceOf(IllegalStateException.class)
+                    .hasRootCauseMessage("storage.s3.bucket is required when storage.provider=s3");
+            System.out.println("Proof: Context failed to start with exact message: "
+                    + context.getStartupFailure().getCause().getMessage());
+        });
+    }
+
+    /**
+     * Verifies fail-fast startup behavior when storage.validation.max-file-size is missing.
+     */
+    @Test
+    @DisplayName("Fail-fast: context fails fast at startup if storage.validation.max-file-size is missing")
+    void testFailFast_whenValidationMaxFileSizeMissing() {
+        System.out.println("=== FAIL-FAST MAX-FILE-SIZE CHECK EVIDENCE ===");
+        new ApplicationContextRunner()
+                .withUserConfiguration(StorageConfiguration.class)
+                .withPropertyValues(
+                        "storage.provider=in-memory",
+                        "storage.validation.allowed-mime-types=image/jpeg"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseInstanceOf(IllegalStateException.class)
+                            .hasRootCauseMessage("storage.validation.max-file-size is required");
+                    System.out.println("Proof: Context failed to start with exact message: "
+                            + context.getStartupFailure().getCause().getMessage());
+                });
+    }
+
+    /**
+     * Verifies fail-fast startup behavior when storage.validation.allowed-mime-types is missing or empty.
+     */
+    @Test
+    @DisplayName("Fail-fast: context fails fast at startup if storage.validation.allowed-mime-types is missing")
+    void testFailFast_whenValidationAllowedMimeTypesMissing() {
+        System.out.println("=== FAIL-FAST ALLOWED-MIME-TYPES CHECK EVIDENCE ===");
+        new ApplicationContextRunner()
+                .withUserConfiguration(StorageConfiguration.class)
+                .withPropertyValues(
+                        "storage.provider=in-memory",
+                        "storage.validation.max-file-size=2MB"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseInstanceOf(IllegalStateException.class)
+                            .hasRootCauseMessage("storage.validation.allowed-mime-types is required and cannot be empty");
+                    System.out.println("Proof: Context failed to start with exact message: "
+                            + context.getStartupFailure().getCause().getMessage());
+                });
     }
 }

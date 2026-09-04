@@ -129,7 +129,10 @@ class FileStorageCoreVerificationTest {
         );
 
         StorageResource retrieved = storageService.retrieve(stored.key());
-        byte[] retrievedBytes = retrieved.content().readAllBytes();
+        byte[] retrievedBytes;
+        try (InputStream stream = retrieved.content()) {
+            retrievedBytes = stream.readAllBytes();
+        }
 
         System.out.println("=== V2 EVIDENCE ===");
         System.out.println("Storage Key: " + retrieved.key());
@@ -330,14 +333,14 @@ class FileStorageCoreVerificationTest {
      */
     @Test
     @DisplayName("1.3: Hard-capped stream reading prevents bypass when client lies about small size")
-    void testHardCappedStream_whenClientLiesAboutSmallSize_shouldThrowFileTooLargeExceptionOnConsumption() {
+    void testHardCappedStream_whenClientLiesAboutSmallSize_shouldThrowFileTooLargeExceptionOnConsumption() throws IOException {
         System.out.println("=== 1.3 EVIDENCE ===");
         long configuredMaxBytes = properties.getValidation().getMaxFileSize().toBytes();
         long declaredFakeSmallSize = 100;
 
         byte[] validHeader = VALID_JPEG_BYTES;
         int oversizedBodyLength = 3 * 1024 * 1024;
-        InputStream oversizedStream = new SequenceInputStream(
+        try (InputStream oversizedStream = new SequenceInputStream(
                 new ByteArrayInputStream(validHeader),
                 new InputStream() {
                     private int count = 0;
@@ -354,33 +357,33 @@ class FileStorageCoreVerificationTest {
                         return available;
                     }
                 }
-        );
+        )) {
+            System.out.println("Configured Max Limit: " + configuredMaxBytes + " bytes (2MB)");
+            System.out.println("Client Declared Size Header: " + declaredFakeSmallSize + " bytes (Lying small)");
+            System.out.println("Actual Stream Payload: ~3.0MB (Exceeds limit)");
 
-        System.out.println("Configured Max Limit: " + configuredMaxBytes + " bytes (2MB)");
-        System.out.println("Client Declared Size Header: " + declaredFakeSmallSize + " bytes (Lying small)");
-        System.out.println("Actual Stream Payload: ~3.0MB (Exceeds limit)");
+            ValidatedFile validated = validator.validateAndSanitize(
+                    oversizedStream,
+                    "lying_client.jpg",
+                    "image/jpeg",
+                    declaredFakeSmallSize
+            );
 
-        ValidatedFile validated = validator.validateAndSanitize(
-                oversizedStream,
-                "lying_client.jpg",
-                "image/jpeg",
-                declaredFakeSmallSize
-        );
+            assertThat(validated.detectedMimeType()).isEqualTo("image/jpeg");
+            System.out.println("MIME sniffing passed for initial header (detected: " + validated.detectedMimeType() + ")");
 
-        assertThat(validated.detectedMimeType()).isEqualTo("image/jpeg");
-        System.out.println("MIME sniffing passed for initial header (detected: " + validated.detectedMimeType() + ")");
+            assertThatThrownBy(() -> storageService.store(
+                    validated.content(),
+                    validated.sanitizedFilename(),
+                    validated.detectedMimeType(),
+                    validated.size()
+            ))
+                    .isInstanceOf(FileTooLargeException.class)
+                    .hasMessageContaining("exceeds the maximum allowed limit of " + configuredMaxBytes + " bytes");
 
-        assertThatThrownBy(() -> storageService.store(
-                validated.content(),
-                validated.sanitizedFilename(),
-                validated.detectedMimeType(),
-                validated.size()
-        ))
-                .isInstanceOf(FileTooLargeException.class)
-                .hasMessageContaining("exceeds the maximum allowed limit of " + configuredMaxBytes + " bytes");
-
-        System.out.println("Proof: Stream consumption aborted with FileTooLargeException as soon as the hard cap was reached.");
-        System.out.println("Memory Protection: Stream reading halted; never read more than maxFileSize into memory!");
+            System.out.println("Proof: Stream consumption aborted with FileTooLargeException as soon as the hard cap was reached.");
+            System.out.println("Memory Protection: Stream reading halted; never read more than maxFileSize into memory!");
+        }
     }
 
     /**
