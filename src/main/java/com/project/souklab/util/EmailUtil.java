@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -187,7 +188,7 @@ public class EmailUtil {
     }
 
     @Async("applicationTaskExecutor")
-    public void sendFormateurRejectedEmail(String toEmail, String adminNote, java.time.LocalDateTime cooldownUntil, boolean canReapply) {
+    public void sendFormateurRejectedEmail(String toEmail, String adminNote, LocalDateTime cooldownUntil, boolean canReapply) {
         String subject = "Artisan Formateur Request Update";
         String reapplyMessage = canReapply
                 ? (cooldownUntil != null ? "You may reapply after " + cooldownUntil + "." : "You may reapply at any time.")

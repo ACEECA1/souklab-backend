@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -139,7 +141,7 @@ class FileStorageCoreVerificationTest {
         System.out.println("Retrieved Content Type: " + retrieved.contentType());
         System.out.println("Retrieved Size: " + retrieved.size());
         System.out.println("Retrieved Original Filename: " + retrieved.originalFilename());
-        System.out.println("Byte-for-byte Match: " + java.util.Arrays.equals(VALID_PNG_BYTES, retrievedBytes));
+        System.out.println("Byte-for-byte Match: " + Arrays.equals(VALID_PNG_BYTES, retrievedBytes));
 
         assertThat(retrieved.key()).isEqualTo(stored.key());
         assertThat(retrieved.contentType()).isEqualTo("image/png");
@@ -301,8 +303,8 @@ class FileStorageCoreVerificationTest {
 
         StorageService mockS3Backend = new StorageService() {
             @Override
-            public StorageResult store(java.io.InputStream content, String originalFilename, String contentType, long size) {
-                return new StorageResult("s3-bucket/mock-key-1234", originalFilename, contentType, size, java.time.Instant.now());
+            public StorageResult store(InputStream content, String originalFilename, String contentType, long size) {
+                return new StorageResult("s3-bucket/mock-key-1234", originalFilename, contentType, size, Instant.now());
             }
 
             @Override
@@ -351,7 +353,7 @@ class FileStorageCoreVerificationTest {
                  public int read(byte[] b, int off, int len) {
                      if (count >= oversizedBodyLength) return -1;
                      int available = Math.min(len, oversizedBodyLength - count);
-                     java.util.Arrays.fill(b, off, off + available, (byte) 0x20);
+                     Arrays.fill(b, off, off + available, (byte) 0x20);
                      count += available;
                      return available;
                  }

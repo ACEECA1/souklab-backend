@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -171,7 +172,7 @@ class S3StorageServiceVerificationTest {
         System.out.println("Retrieved Content-Type: " + retrieved.contentType());
         System.out.println("Retrieved Size: " + retrieved.size() + " bytes");
         System.out.println("Retrieved Original Filename: " + retrieved.originalFilename());
-        System.out.println("Byte-for-byte Match: " + java.util.Arrays.equals(VALID_JPEG_BYTES, downloadedBytes));
+        System.out.println("Byte-for-byte Match: " + Arrays.equals(VALID_JPEG_BYTES, downloadedBytes));
 
         assertThat(downloadedBytes).isEqualTo(VALID_JPEG_BYTES);
         assertThat(retrieved.contentType()).isEqualTo("image/jpeg");
