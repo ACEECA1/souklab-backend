@@ -31,7 +31,10 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
-        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+        if (!(authentication.getPrincipal() instanceof OAuth2User oAuth2User)) {
+            throw new IllegalArgumentException("Expected principal of type OAuth2User, but found: "
+                    + (authentication.getPrincipal() != null ? authentication.getPrincipal().getClass().getName() : "null"));
+        }
 
         String intentRole = extractIntentRole(request);
 

@@ -41,14 +41,25 @@ public class StorageConfiguration {
 
     /**
      * Provides the provider-agnostic file validator and sanitizer component.
+     * Validates that max file size and allowed MIME types are configured,
+     * failing fast at startup with an {@link IllegalStateException} if missing or empty.
      *
      * @param properties configuration properties for file validation
      * @param tika Apache Tika detector instance
      * @return a configured FileValidator
+     * @throws IllegalStateException if validation properties are missing or empty
      */
     @Bean
     @ConditionalOnMissingBean
     public FileValidator fileValidator(StorageProperties properties, Tika tika) {
+        if (properties == null || properties.getValidation() == null
+                || properties.getValidation().getMaxFileSize() == null) {
+            throw new IllegalStateException("storage.validation.max-file-size is required");
+        }
+        if (properties.getValidation().getAllowedMimeTypes() == null
+                || properties.getValidation().getAllowedMimeTypes().isEmpty()) {
+            throw new IllegalStateException("storage.validation.allowed-mime-types is required and cannot be empty");
+        }
         return new FileValidator(properties, tika);
     }
 
@@ -66,12 +77,12 @@ public class StorageConfiguration {
 
     /**
      * Registers the AWS SDK v2 {@link S3Client} when {@code storage.provider=s3}.
-     * Validates that access key and secret key are present, failing fast at startup
-     * with an {@link IllegalStateException} if either is missing or blank.
+     * Validates that access key, secret key, and bucket are present, failing fast at startup
+     * with an {@link IllegalStateException} if any is missing or blank.
      *
      * @param properties file storage properties containing S3 settings
      * @return a configured S3Client
-     * @throws IllegalStateException if credentials are missing or blank
+     * @throws IllegalStateException if credentials or bucket are missing or blank
      */
     @Bean
     @ConditionalOnProperty(name = "storage.provider", havingValue = "s3")
@@ -82,6 +93,9 @@ public class StorageConfiguration {
                 || s3.getAccessKey() == null || s3.getAccessKey().isBlank()
                 || s3.getSecretKey() == null || s3.getSecretKey().isBlank()) {
             throw new IllegalStateException("storage.s3.access-key and storage.s3.secret-key are required when storage.provider=s3");
+        }
+        if (s3.getBucket() == null || s3.getBucket().isBlank()) {
+            throw new IllegalStateException("storage.s3.bucket is required when storage.provider=s3");
         }
 
         String region = (s3.getRegion() != null && !s3.getRegion().isBlank()) ? s3.getRegion() : "us-east-1";

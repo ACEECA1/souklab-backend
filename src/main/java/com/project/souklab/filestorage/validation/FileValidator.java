@@ -4,7 +4,6 @@ import com.project.souklab.filestorage.config.StorageProperties;
 import com.project.souklab.filestorage.exception.FileTooLargeException;
 import com.project.souklab.filestorage.exception.InvalidFilenameException;
 import com.project.souklab.filestorage.exception.UnsupportedFileTypeException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Component;
@@ -39,7 +38,6 @@ import java.util.List;
  * Storage keys must always be generated safe identifiers (e.g. UUID-based) to guarantee path isolation.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class FileValidator {
 
@@ -47,6 +45,26 @@ public class FileValidator {
 
     private final StorageProperties properties;
     private final Tika tika;
+
+    /**
+     * Constructs a FileValidator, failing fast at startup if required validation properties are missing or empty.
+     *
+     * @param properties configuration properties for file validation
+     * @param tika Apache Tika detector instance
+     * @throws IllegalStateException if max-file-size or allowed-mime-types configuration is missing or empty
+     */
+    public FileValidator(StorageProperties properties, Tika tika) {
+        if (properties == null || properties.getValidation() == null
+                || properties.getValidation().getMaxFileSize() == null) {
+            throw new IllegalStateException("storage.validation.max-file-size is required");
+        }
+        if (properties.getValidation().getAllowedMimeTypes() == null
+                || properties.getValidation().getAllowedMimeTypes().isEmpty()) {
+            throw new IllegalStateException("storage.validation.allowed-mime-types is required and cannot be empty");
+        }
+        this.properties = properties;
+        this.tika = tika;
+    }
 
     /**
      * Validates and sanitizes a byte array file upload by delegating to
@@ -90,6 +108,10 @@ public class FileValidator {
             throw new UnsupportedFileTypeException("Uploaded file stream cannot be null");
         }
 
+        if (properties.getValidation() == null || properties.getValidation().getMaxFileSize() == null) {
+            throw new IllegalStateException("storage.validation.max-file-size is required");
+        }
+
         long maxBytes = properties.getValidation().getMaxFileSize().toBytes();
         if (declaredSize > maxBytes) {
             log.warn("File upload rejected: declared size {} bytes exceeds maximum limit {} bytes", declaredSize, maxBytes);
@@ -114,6 +136,9 @@ public class FileValidator {
         }
 
         List<String> allowedTypes = properties.getValidation().getAllowedMimeTypes();
+        if (allowedTypes == null || allowedTypes.isEmpty()) {
+            throw new IllegalStateException("storage.validation.allowed-mime-types is required and cannot be empty");
+        }
         boolean isAllowed = allowedTypes.stream()
                 .anyMatch(allowed -> allowed.equalsIgnoreCase(detectedMimeType));
 

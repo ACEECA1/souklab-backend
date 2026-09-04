@@ -25,7 +25,10 @@ public class JwtUtils {
     }
 
     public String generateAccessToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        if (!(authentication.getPrincipal() instanceof UserDetails userPrincipal)) {
+            throw new IllegalArgumentException("Expected principal of type UserDetails, but found: "
+                    + (authentication.getPrincipal() != null ? authentication.getPrincipal().getClass().getName() : "null"));
+        }
         return generateTokenFromUsername(userPrincipal.getUsername(), appProperties.getJwt().getAccessTokenExpirationMs());
     }
 
@@ -34,7 +37,10 @@ public class JwtUtils {
     }
 
     public String generateRefreshToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        if (!(authentication.getPrincipal() instanceof UserDetails userPrincipal)) {
+            throw new IllegalArgumentException("Expected principal of type UserDetails, but found: "
+                    + (authentication.getPrincipal() != null ? authentication.getPrincipal().getClass().getName() : "null"));
+        }
         return generateTokenFromUsername(userPrincipal.getUsername(), appProperties.getJwt().getRefreshTokenExpirationMs());
     }
 
