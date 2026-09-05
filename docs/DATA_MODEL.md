@@ -91,6 +91,20 @@ All entity classes inherit from `BaseEntity`:
 | `is_premium` | `BOOLEAN` | Default FALSE | Full directory access permission |
 | `is_verified` | `BOOLEAN` | Default FALSE | Verified buyer badge |
 
+#### `user_avatars`
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | PK | Unique Avatar Identifier (UUID) |
+| `user_id` | `VARCHAR(36)` | FK -> `users.id` | Owning User Identifier |
+| `storage_key_original` | `VARCHAR(255)` | Not Null | S3 storage key for original tier (max 2000px) |
+| `storage_key_medium` | `VARCHAR(255)` | Not Null | S3 storage key for medium tier (max 500px) |
+| `storage_key_thumbnail` | `VARCHAR(255)` | Not Null | S3 storage key for thumbnail tier (max 150px) |
+| `original_filename` | `VARCHAR(255)` | Not Null | Sanitized client original filename |
+| `content_type` | `VARCHAR(50)` | Not Null | MIME type (`image/jpeg`, `image/png`, `image/webp`) |
+| `file_size` | `BIGINT` | Not Null | Uploaded original image size in bytes |
+| `is_active` | `BOOLEAN` | Default FALSE | Active profile avatar selection flag |
+| `uploaded_at` | `TIMESTAMP` | Not Null | Avatar upload timestamp |
+
 ---
 
 ### 2.3 Catalog & Heritage Taxonomy

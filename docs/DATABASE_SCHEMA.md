@@ -21,7 +21,7 @@ Every table representing a full domain entity includes standard auditing columns
 | Classification | Soft-Delete (`deleted_at` present) | Hard-Delete / Immutable Append-Only | Rationale |
 | :--- | :--- | :--- | :--- |
 | **Domain Entities** | `users`, `artisans`, `clients`, `formations`, `feed_posts`, `artisan_gallery_images`, `artisan_certifications`, `artisan_achievements`, `artisan_social_links`, `conversations`, `messages`, `reviews` | — | User-facing assets that users or artisans can delete or archive, while preserving referential integrity and audit trails. |
-| **Join / Link Tables & Auth Links** | — | `user_roles`, `oauth_identities`, `verification_tokens`, `artisan_materials`, `artisan_techniques`, `artisan_epoques`, `conversation_participants` | Pure junction tables and third-party identity bindings. Associations and linked OAuth accounts are added/unlinked (hard-deleted) directly. |
+| **Join / Link Tables, Auth Links & Avatars** | — | `user_roles`, `oauth_identities`, `verification_tokens`, `user_avatars`, `artisan_materials`, `artisan_techniques`, `artisan_epoques`, `conversation_participants` | Pure junction tables, third-party identity bindings, and user avatars. Associations, linked OAuth accounts, and gallery avatars are unlinked or hard-deleted directly to purge physical storage and enforce quotas. |
 | **Financial & Ledger** | — | `payments`, `client_subscriptions`, `artisan_subscriptions`, `subscription_pricing` | Financial transaction history must remain immutable. Subscriptions transition to `CANCELLED` or `EXPIRED` status rather than being deleted. |
 | **Auditing & Moderation** | — | `audit_logs`, `payment_webhook_logs`, `artisan_validations`, `formation_reviews`, `formation_enrollments`, `reports`, `notifications` | Append-only security and administrative decision records. Must never be altered or deleted. |
 
@@ -169,6 +169,34 @@ Cryptographically hashed single-use verification and password-reset codes with a
   - `ManyToOne` with `User` (owning side: `VerificationToken`, fetch: `LAZY`, foreign key column: `user_id`).
 - **Indexes & Unique Constraints**:
   - `idx_verification_tokens_user_type` (`user_id`, `type`, `used_at`): Composite index for fast active token lookups and invalidations.
+
+---
+
+### 2.7 `user_avatars`
+User avatar gallery assets with references to processed multi-resolution storage tiers (original, medium, thumbnail). Supports gallery history up to 10 avatars per user with exactly one active avatar. Hard-deleted on removal to physically purge S3/MinIO objects and free quota.
+
+| Column Name | SQL Type | Nullable | Default | Constraints & Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | `NO` | — | **PK** (UUID) |
+| `user_id` | `VARCHAR(36)` | `NO` | — | **FK** -> `users.id` (`ON DELETE CASCADE`) |
+| `storage_key_original` | `VARCHAR(255)` | `NO` | — | S3 storage key for original resolution tier (max 2000px) |
+| `storage_key_medium` | `VARCHAR(255)` | `NO` | — | S3 storage key for medium resolution tier (max 500px) |
+| `storage_key_thumbnail` | `VARCHAR(255)` | `NO` | — | S3 storage key for thumbnail resolution tier (max 150px) |
+| `original_filename` | `VARCHAR(255)` | `NO` | — | Sanitized original client filename |
+| `content_type` | `VARCHAR(50)` | `NO` | — | Verified MIME type (`image/jpeg`, `image/png`, `image/webp`) |
+| `file_size` | `BIGINT` | `NO` | — | Payload size in bytes of the original uploaded image |
+| `is_active` | `BOOLEAN` | `NO` | `FALSE` | Active profile avatar flag (at most one true per user) |
+| `uploaded_at` | `DATETIME(6)` | `NO` | — | Timestamp when avatar was uploaded and persisted |
+| `created_at` | `DATETIME(6)` | `NO` | — | Audit creation timestamp |
+| `updated_at` | `DATETIME(6)` | `NO` | — | Audit update timestamp |
+| `deleted_at` | `DATETIME(6)` | `YES` | `NULL` | Inherited BaseEntity column (unused; hard-delete policy) |
+
+- **Relationships**:
+  - `ManyToOne` with `User` (owning side: `UserAvatar`, fetch: `LAZY`, foreign key column: `user_id`).
+- **Indexes & Unique Constraints**:
+  - `idx_user_avatars_user_id` (`user_id`): Fast retrieval and quota checking per user.
+  - `idx_user_avatars_user_active` (`user_id`, `is_active`): Fast lookup for the user's currently active avatar.
+  - `idx_user_avatars_user_uploaded` (`user_id`, `uploaded_at`): Efficient sorting for gallery history listings.
 
 ---
 
