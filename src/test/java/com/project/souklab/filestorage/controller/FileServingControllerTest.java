@@ -29,6 +29,7 @@ import static com.project.souklab.controller.support.SecurityTestUtils.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.startsWith;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -248,7 +249,7 @@ class FileServingControllerTest {
             };
 
             StorageResource resource = new StorageResource("test-key", spyStream, "text/plain", data.length, "test.txt");
-            StorageService mockService = org.mockito.Mockito.mock(StorageService.class);
+            StorageService mockService = mock(StorageService.class);
             when(mockService.retrieve("test-key")).thenReturn(resource);
             FileServingController controller = new FileServingController(mockService);
 
@@ -278,7 +279,7 @@ class FileServingControllerTest {
             };
 
             StorageResource resource = new StorageResource("test-key", spyStream, "text/plain", data.length, "test.txt");
-            StorageService mockService = org.mockito.Mockito.mock(StorageService.class);
+            StorageService mockService = mock(StorageService.class);
             when(mockService.retrieve("test-key")).thenReturn(resource);
             FileServingController controller = new FileServingController(mockService);
 

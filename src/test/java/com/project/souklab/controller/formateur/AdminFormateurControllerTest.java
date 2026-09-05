@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -544,7 +545,7 @@ class AdminFormateurControllerTest {
         @Test
         @DisplayName("artisan not found maps to 404 Not Found")
         void revokeDirectly_whenArtisanNotFound_shouldReturn404NotFound() throws Exception {
-            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Artisan not found with ID: artisan-999"))
+            doThrow(new ResourceNotFoundException("Artisan not found with ID: artisan-999"))
                     .when(artisanFormateurService).revokeDirectly(eq("artisan-999"), any(FormateurRevokeDTO.class));
 
             mockMvc.perform(post("/api/v1/admin/artisans/artisan-999/formateur-revoke")
@@ -561,7 +562,7 @@ class AdminFormateurControllerTest {
         @Test
         @DisplayName("artisan not a formateur maps to 400 Bad Request")
         void revokeDirectly_whenNotFormateur_shouldReturn400BadRequest() throws Exception {
-            org.mockito.Mockito.doThrow(new BadRequestException("Artisan is not currently a formateur"))
+            doThrow(new BadRequestException("Artisan is not currently a formateur"))
                     .when(artisanFormateurService).revokeDirectly(eq("artisan-60"), any(FormateurRevokeDTO.class));
 
             mockMvc.perform(post("/api/v1/admin/artisans/artisan-60/formateur-revoke")

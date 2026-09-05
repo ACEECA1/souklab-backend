@@ -1,5 +1,6 @@
 package com.project.souklab.filestorage.validation;
 
+import com.project.souklab.filestorage.StorageService;
 import com.project.souklab.filestorage.config.StorageProperties;
 import com.project.souklab.filestorage.exception.FileTooLargeException;
 import com.project.souklab.filestorage.exception.InvalidFilenameException;
@@ -27,7 +28,7 @@ import java.util.List;
  * preventing memory or disk exhaustion if a client declares a small size but sends a larger payload.
  *
  * <p><strong>Stream Consumption &amp; Invariant Rule:</strong>
- * Any {@link com.project.souklab.filestorage.StorageService} implementation MUST consume the
+ * Any {@link StorageService} implementation MUST consume the
  * {@link ValidatedFile#content()} wrapped stream (the stream that was already wrapped in
  * {@link SizeLimitingInputStream}) and MUST NEVER re-wrap or substitute the original raw stream.
  * The hard size-cap and memory-exhaustion defenses strictly depend on this invariant being respected

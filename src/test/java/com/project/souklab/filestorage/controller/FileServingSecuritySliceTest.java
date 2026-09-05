@@ -7,13 +7,11 @@ import com.project.souklab.filestorage.StorageService;
 import com.project.souklab.filestorage.config.StorageProperties;
 import com.project.souklab.filestorage.security.FileRateLimitFilter;
 import com.project.souklab.security.JwtAuthenticationFilter;
+import com.project.souklab.security.JwtUtils;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
 import com.project.souklab.security.RateLimitFilter;
 import com.project.souklab.util.ServletResponseUtil;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.DispatcherType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,19 +19,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Security slice test verifying that {@link SecurityConfig}'s authorization rules apply
- * strictly to initial {@link jakarta.servlet.DispatcherType#REQUEST} dispatches on {@code /api/v1/files/**},
+ * strictly to initial {@link DispatcherType#REQUEST} dispatches on {@code /api/v1/files/**},
  * rejecting unauthenticated calls with 401, while permitting internal async/error dispatches.
  */
 @WebMvcTest(controllers = FileServingController.class)
@@ -82,17 +80,17 @@ class FileServingSecuritySliceTest {
         }
 
         @Bean
-        public org.springframework.security.core.userdetails.UserDetailsService userDetailsService() {
-            return org.mockito.Mockito.mock(org.springframework.security.core.userdetails.UserDetailsService.class);
+        public UserDetailsService userDetailsService() {
+            return mock(UserDetailsService.class);
         }
 
         @Bean
-        public com.project.souklab.security.JwtUtils jwtUtils() {
-            return org.mockito.Mockito.mock(com.project.souklab.security.JwtUtils.class);
+        public JwtUtils jwtUtils() {
+            return mock(JwtUtils.class);
         }
 
         @Bean
-        public JwtAuthenticationFilter jwtAuthenticationFilter(com.project.souklab.security.JwtUtils jwtUtils, org.springframework.security.core.userdetails.UserDetailsService userDetailsService) {
+        public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
             return new JwtAuthenticationFilter(jwtUtils, userDetailsService);
         }
 
