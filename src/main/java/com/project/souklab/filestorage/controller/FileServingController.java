@@ -22,10 +22,15 @@ import java.nio.charset.StandardCharsets;
  * Streams content directly from the underlying storage provider with immutable caching headers.
  */
 @RestController
-@RequestMapping("/api/v1/files")
+@RequestMapping(FileServingController.BASE_PATH)
 @RequiredArgsConstructor
 @Slf4j
 public class FileServingController {
+
+    /**
+     * Single source of truth for the file-serving route, referenced by AvatarService and FileRateLimitFilter to avoid drift.
+     */
+    public static final String BASE_PATH = "/api/v1/files";
 
     private final StorageService storageService;
 

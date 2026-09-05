@@ -2,6 +2,7 @@ package com.project.souklab.controller.user;
 
 import com.project.souklab.dao.UserRepository;
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.dto.user.AvatarResponseDTO;
 import com.project.souklab.exception.BadRequestException;
 import com.project.souklab.exception.ResourceNotFoundException;
@@ -13,11 +14,18 @@ import com.project.souklab.service.user.AvatarService;
 import com.project.souklab.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,11 +74,69 @@ public class AvatarController {
             }
         }
 
-        User currentUser = userRepository.findByEmail(username.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+        User currentUser = getAuthenticatedUser();
 
         AvatarResponseDTO response = avatarService.uploadAvatar(currentUser, file);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Avatar uploaded successfully"));
+    }
+
+    /**
+     * Retrieves the paginated avatar gallery history for the currently authenticated user.
+     *
+     * @param pageable pagination and sorting parameters (defaults to 20 items ordered by uploadedAt descending)
+     * @return 200 OK containing PaginatedResponse of AvatarResponseDTO objects
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<PaginatedResponse<AvatarResponseDTO>>> listAvatars(
+            @PageableDefault(size = 20, sort = "uploadedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        User currentUser = getAuthenticatedUser();
+        PaginatedResponse<AvatarResponseDTO> response = avatarService.listAvatars(currentUser, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Deletes a specific avatar belonging to the currently authenticated user.
+     *
+     * @param id the unique identifier of the avatar to delete
+     * @return 200 OK with confirmation message and null data payload
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteAvatar(@PathVariable String id) {
+        User currentUser = getAuthenticatedUser();
+        avatarService.deleteAvatar(currentUser, id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Avatar deleted successfully"));
+    }
+
+    /**
+     * Activates a previous avatar belonging to the currently authenticated user without re-uploading.
+     *
+     * @param id the unique identifier of the avatar to activate
+     * @return 200 OK containing the activated AvatarResponseDTO
+     */
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<AvatarResponseDTO>> activateAvatar(@PathVariable String id) {
+        User currentUser = getAuthenticatedUser();
+        AvatarResponseDTO response = avatarService.activateAvatar(currentUser, id);
+        return ResponseEntity.ok(ApiResponse.success(response, "Avatar activated successfully"));
+    }
+
+    /**
+     * Resolves and validates the currently authenticated User entity from the security context.
+     *
+     * @return the authenticated User entity
+     * @throws UnauthorizedException if no authenticated user is present
+     * @throws ResourceNotFoundException if the user record does not exist
+     */
+    private User getAuthenticatedUser() {
+        String username = SecurityUtils.getCurrentUsername();
+        if (username == null) {
+            throw new UnauthorizedException("User is not authenticated");
+        }
+        return userRepository.findByEmail(username.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
     }
 }

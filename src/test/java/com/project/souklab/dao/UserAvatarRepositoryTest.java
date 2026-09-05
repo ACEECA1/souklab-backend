@@ -10,6 +10,10 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.test.context.TestPropertySource;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -243,5 +247,34 @@ class UserAvatarRepositoryTest {
         assertThat(foundByIdAndUser).isEmpty();
         assertThat(foundInEm).isNull();
         assertThat(userAvatarRepository.countByUserId(user.getId())).isZero();
+    }
+
+    /**
+     * Verifies that findByUserId with Pageable returns paginated avatars for the specified user
+     * ordered according to the requested Sort specification while isolating from other users.
+     */
+    @Test
+    @DisplayName("findByUserId with Pageable returns paged avatars for the specified user")
+    void findByUserId_withPageable_returnsPagedResultsForUser() {
+        User user1 = persistUser("user1@souklab.dz");
+        User user2 = persistUser("user2@souklab.dz");
+
+        LocalDateTime baseTime = LocalDateTime.of(2026, 9, 5, 10, 0, 0);
+        UserAvatar avatar1 = persistAvatar(user1, "first.jpg", false, baseTime.minusDays(2));
+        UserAvatar avatar2 = persistAvatar(user1, "second.jpg", true, baseTime);
+        UserAvatar avatar3 = persistAvatar(user1, "third.jpg", false, baseTime.minusDays(1));
+        persistAvatar(user2, "user2.jpg", true, baseTime);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        PageRequest pageRequest = PageRequest.of(0, 2, Sort.by(Sort.Direction.DESC, "uploadedAt"));
+        Page<UserAvatar> page = userAvatarRepository.findByUserId(user1.getId(), pageRequest);
+
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+        assertThat(page.getContent()).hasSize(2);
+        assertThat(page.getContent().get(0).getId()).isEqualTo(avatar2.getId());
+        assertThat(page.getContent().get(1).getId()).isEqualTo(avatar3.getId());
     }
 }

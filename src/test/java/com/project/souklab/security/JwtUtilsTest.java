@@ -72,7 +72,7 @@ class JwtUtilsTest {
         assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo("artisan@example.com");
 
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).setClock(() -> Date.from(fixedClock.instant())).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo("artisan@example.com");
         assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
         assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(ACCESS_TOKEN_EXPIRATION_MS)));
@@ -107,7 +107,7 @@ class JwtUtilsTest {
         assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo(username);
 
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).setClock(() -> Date.from(fixedClock.instant())).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo(username);
         assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
         assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(ACCESS_TOKEN_EXPIRATION_MS)));
@@ -132,7 +132,7 @@ class JwtUtilsTest {
         assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo("refresh@example.com");
 
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
-        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).setClock(() -> Date.from(fixedClock.instant())).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo("refresh@example.com");
         assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
         assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(REFRESH_TOKEN_EXPIRATION_MS)));
@@ -217,8 +217,8 @@ class JwtUtilsTest {
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
         String expiredToken = Jwts.builder()
                 .setSubject("expired@example.com")
-                .setIssuedAt(new Date(System.currentTimeMillis() - 120000L))
-                .setExpiration(new Date(System.currentTimeMillis() - 60000L))
+                .setIssuedAt(Date.from(fixedClock.instant().minusSeconds(120)))
+                .setExpiration(Date.from(fixedClock.instant().minusSeconds(60)))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
 

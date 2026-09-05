@@ -2,6 +2,7 @@ package com.project.souklab.filestorage.security;
 
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.filestorage.config.StorageProperties;
+import com.project.souklab.filestorage.controller.FileServingController;
 import com.project.souklab.util.ServletResponseUtil;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -53,7 +54,7 @@ public class FileRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri == null || !uri.startsWith("/api/v1/files");
+        return uri == null || !uri.startsWith(FileServingController.BASE_PATH);
     }
 
     /**

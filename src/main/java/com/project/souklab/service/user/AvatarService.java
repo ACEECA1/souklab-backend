@@ -1,12 +1,16 @@
 package com.project.souklab.service.user;
 
+import com.project.souklab.config.AvatarProperties;
 import com.project.souklab.dao.UserAvatarRepository;
 import com.project.souklab.dao.UserRepository;
+import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.dto.user.AvatarResponseDTO;
 import com.project.souklab.exception.AvatarLimitExceededException;
 import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ResourceNotFoundException;
 import com.project.souklab.filestorage.StorageResult;
 import com.project.souklab.filestorage.StorageService;
+import com.project.souklab.filestorage.controller.FileServingController;
 import com.project.souklab.filestorage.exception.StorageException;
 import com.project.souklab.filestorage.image.ImageProcessingService;
 import com.project.souklab.filestorage.image.ImageVariant;
@@ -18,6 +22,8 @@ import com.project.souklab.model.User;
 import com.project.souklab.model.UserAvatar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,25 +46,6 @@ import java.util.Map;
 @Slf4j
 public class AvatarService {
 
-    /**
-     * Maximum allowed avatars stored per user in gallery history.
-     */
-    public static final long MAX_AVATARS_PER_USER = 10L;
-
-    /**
-     * URL path prefix for serving files through the application's file-serving endpoint.
-     */
-    public static final String FILE_SERVING_PATH_PREFIX = "/api/v1/files/";
-
-    /**
-     * Strict set of MIME types allowed exclusively for user avatar uploads.
-     */
-    public static final List<String> AVATAR_ALLOWED_MIME_TYPES = List.of(
-            "image/jpeg",
-            "image/png",
-            "image/webp"
-    );
-
     private final UserAvatarRepository userAvatarRepository;
     private final UserRepository userRepository;
     private final FileValidator fileValidator;
@@ -67,12 +54,13 @@ public class AvatarService {
     private final StorageService storageService;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
+    private final AvatarProperties avatarProperties;
 
     /**
      * Uploads, processes, stores, and activates a new avatar for the authenticated user.
      * Execution pipeline follows strict sequencing:
      * <ol>
-     *   <li>Quota verification (must not exceed 10 avatars).</li>
+     *   <li>Quota verification (must not exceed configured maximum avatars).</li>
      *   <li>File validation and sanitization against image-only MIME constraints.</li>
      *   <li>Antivirus scanning.</li>
      *   <li>Three-tier image variant generation (Original, Medium, Thumbnail).</li>
@@ -84,7 +72,7 @@ public class AvatarService {
      * @param file the multipart avatar image payload
      * @return AvatarResponseDTO containing image URLs for all three resolution tiers
      * @throws BadRequestException if the file is missing or empty
-     * @throws AvatarLimitExceededException if the user has reached the 10-avatar limit
+     * @throws AvatarLimitExceededException if the user has reached the configured avatar limit
      * @throws StorageException if variant generation or storage operations fail
      */
     public AvatarResponseDTO uploadAvatar(User currentUser, MultipartFile file) {
@@ -96,11 +84,11 @@ public class AvatarService {
         }
 
         long existingCount = userAvatarRepository.countByUserId(currentUser.getId());
-        if (existingCount >= MAX_AVATARS_PER_USER) {
+        if (existingCount >= avatarProperties.getMaxPerUser()) {
             log.warn("Avatar upload rejected for user {}: quota limit of {} avatars reached",
-                    currentUser.getId(), MAX_AVATARS_PER_USER);
+                    currentUser.getId(), avatarProperties.getMaxPerUser());
             throw new AvatarLimitExceededException(
-                    "Maximum avatar limit of " + MAX_AVATARS_PER_USER + " reached. Please delete an existing avatar before uploading a new one."
+                    "Maximum avatar limit of " + avatarProperties.getMaxPerUser() + " reached. Please delete an existing avatar before uploading a new one."
             );
         }
 
@@ -111,7 +99,7 @@ public class AvatarService {
                     file.getOriginalFilename(),
                     file.getContentType(),
                     file.getSize(),
-                    AVATAR_ALLOWED_MIME_TYPES
+                    avatarProperties.getAllowedMimeTypes()
             );
         } catch (IOException e) {
             log.error("Failed to read avatar upload stream for user {}", currentUser.getId(), e);
@@ -183,8 +171,7 @@ public class AvatarService {
 
                 UserAvatar savedAvatar = userAvatarRepository.save(newAvatar);
 
-                currentUser.setAvatarUrl(FILE_SERVING_PATH_PREFIX + thumbnailKey);
-                userRepository.save(currentUser);
+                syncUserAvatar(currentUser, thumbnailKey);
 
                 return mapToResponseDTO(savedAvatar);
             });
@@ -194,6 +181,100 @@ public class AvatarService {
             compensateStorageDeletions(storedKeys);
             throw ex;
         }
+    }
+
+    /**
+     * Retrieves a paginated gallery list of avatars uploaded by the authenticated user.
+     *
+     * @param currentUser the authenticated user requesting their gallery
+     * @param pageable pagination and sorting parameters
+     * @return paginated response containing mapped AvatarResponseDTO objects
+     */
+    public PaginatedResponse<AvatarResponseDTO> listAvatars(User currentUser, Pageable pageable) {
+        if (currentUser == null) {
+            throw new IllegalArgumentException("Current user cannot be null");
+        }
+        Page<UserAvatar> page = userAvatarRepository.findByUserId(currentUser.getId(), pageable);
+        return PaginatedResponse.from(page.map(this::mapToResponseDTO));
+    }
+
+    /**
+     * Hard-deletes an avatar belonging to the authenticated user from the database and storage.
+     * If the avatar is currently active, the user's profile avatar URL is cleared to null without auto-promoting
+     * another avatar. Physical storage variant deletion is executed best-effort after the database transaction commits.
+     *
+     * @param currentUser the authenticated user owning the avatar
+     * @param avatarId the unique identifier of the avatar to delete
+     * @throws ResourceNotFoundException if the avatar does not exist or does not belong to the user
+     */
+    public void deleteAvatar(User currentUser, String avatarId) {
+        if (currentUser == null) {
+            throw new IllegalArgumentException("Current user cannot be null");
+        }
+        UserAvatar avatar = userAvatarRepository.findByIdAndUserId(avatarId, currentUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Avatar not found with id: " + avatarId));
+
+        List<String> keysToDelete = List.of(
+                avatar.getStorageKeyOriginal(),
+                avatar.getStorageKeyMedium(),
+                avatar.getStorageKeyThumbnail()
+        );
+
+        transactionTemplate.execute(status -> {
+            userAvatarRepository.delete(avatar);
+            if (avatar.isActive()) {
+                currentUser.setAvatarUrl(null);
+                userRepository.save(currentUser);
+            }
+            return null;
+        });
+
+        for (String key : keysToDelete) {
+            try {
+                storageService.delete(key);
+                log.debug("Deleted storage key '{}' for avatar '{}'", key, avatarId);
+            } catch (Exception e) {
+                log.error("Failed to delete storage key '{}' for avatar '{}': {}", key, avatarId, e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * Activates a previous avatar for the authenticated user without re-uploading.
+     * If the avatar is already active, this operation is an idempotent no-op.
+     * Otherwise, any previously active avatar is set to inactive, the target avatar is activated,
+     * and the user's profile avatar URL is updated to the target's thumbnail.
+     *
+     * @param currentUser the authenticated user activating the avatar
+     * @param avatarId the unique identifier of the avatar to activate
+     * @return AvatarResponseDTO of the activated avatar
+     * @throws ResourceNotFoundException if the avatar does not exist or does not belong to the user
+     */
+    public AvatarResponseDTO activateAvatar(User currentUser, String avatarId) {
+        if (currentUser == null) {
+            throw new IllegalArgumentException("Current user cannot be null");
+        }
+        UserAvatar avatar = userAvatarRepository.findByIdAndUserId(avatarId, currentUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Avatar not found with id: " + avatarId));
+
+        if (avatar.isActive()) {
+            return mapToResponseDTO(avatar);
+        }
+
+        return transactionTemplate.execute(status -> {
+            userAvatarRepository.findByUserIdAndIsActiveTrue(currentUser.getId())
+                    .ifPresent(previousActive -> {
+                        previousActive.setActive(false);
+                        userAvatarRepository.save(previousActive);
+                    });
+
+            avatar.setActive(true);
+            UserAvatar savedAvatar = userAvatarRepository.save(avatar);
+
+            syncUserAvatar(currentUser, avatar.getStorageKeyThumbnail());
+
+            return mapToResponseDTO(savedAvatar);
+        });
     }
 
     /**
@@ -213,17 +294,29 @@ public class AvatarService {
     }
 
     /**
+     * Synchronizes the user's active profile avatar URL with the specified thumbnail storage key.
+     *
+     * @param user the user whose profile avatar URL is being synchronized
+     * @param thumbnailKey the storage key of the active thumbnail image variant
+     */
+    private void syncUserAvatar(User user, String thumbnailKey) {
+        user.setAvatarUrl(FileServingController.BASE_PATH + "/" + thumbnailKey);
+        userRepository.save(user);
+    }
+
+    /**
      * Maps a persisted UserAvatar entity into an AvatarResponseDTO.
      *
      * @param avatar the entity to convert
      * @return the populated response DTO
      */
     private AvatarResponseDTO mapToResponseDTO(UserAvatar avatar) {
+        String urlPrefix = FileServingController.BASE_PATH + "/";
         return AvatarResponseDTO.builder()
                 .id(avatar.getId())
-                .urlOriginal(FILE_SERVING_PATH_PREFIX + avatar.getStorageKeyOriginal())
-                .urlMedium(FILE_SERVING_PATH_PREFIX + avatar.getStorageKeyMedium())
-                .urlThumbnail(FILE_SERVING_PATH_PREFIX + avatar.getStorageKeyThumbnail())
+                .urlOriginal(urlPrefix + avatar.getStorageKeyOriginal())
+                .urlMedium(urlPrefix + avatar.getStorageKeyMedium())
+                .urlThumbnail(urlPrefix + avatar.getStorageKeyThumbnail())
                 .originalFilename(avatar.getOriginalFilename())
                 .contentType(avatar.getContentType())
                 .fileSize(avatar.getFileSize())

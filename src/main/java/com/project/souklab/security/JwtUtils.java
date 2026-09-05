@@ -58,13 +58,20 @@ public class JwtUtils {
     }
 
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .setClock(() -> Date.from(clock.instant()))
+                .build()
                 .parseClaimsJws(token).getBody().getSubject();
     }
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
+            Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .setClock(() -> Date.from(clock.instant()))
+                    .build()
+                    .parseClaimsJws(authToken);
             return true;
         } catch (SecurityException e) {
             log.error("Invalid JWT signature: {}", e.getMessage());

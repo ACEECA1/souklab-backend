@@ -1,6 +1,8 @@
 package com.project.souklab.dao;
 
 import com.project.souklab.model.UserAvatar;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -21,6 +23,15 @@ public interface UserAvatarRepository extends JpaRepository<UserAvatar, String> 
      * @return ordered list of user avatars
      */
     List<UserAvatar> findByUserIdOrderByUploadedAtDesc(String userId);
+
+    /**
+     * Retrieves a paginated slice of avatar entries belonging to a given user.
+     *
+     * @param userId the unique identifier of the user
+     * @param pageable pagination and sorting parameters
+     * @return page of user avatars
+     */
+    Page<UserAvatar> findByUserId(String userId, Pageable pageable);
 
     /**
      * Counts the total number of avatars currently stored for a given user.

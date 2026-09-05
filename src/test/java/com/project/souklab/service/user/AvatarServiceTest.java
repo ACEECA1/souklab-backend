@@ -1,10 +1,13 @@
 package com.project.souklab.service.user;
 
+import com.project.souklab.config.AvatarProperties;
 import com.project.souklab.dao.UserAvatarRepository;
 import com.project.souklab.dao.UserRepository;
+import com.project.souklab.dto.common.PaginatedResponse;
 import com.project.souklab.dto.user.AvatarResponseDTO;
 import com.project.souklab.exception.AvatarLimitExceededException;
 import com.project.souklab.exception.BadRequestException;
+import com.project.souklab.exception.ResourceNotFoundException;
 import com.project.souklab.filestorage.StorageResult;
 import com.project.souklab.filestorage.StorageService;
 import com.project.souklab.filestorage.exception.StorageException;
@@ -19,11 +22,16 @@ import com.project.souklab.model.User;
 import com.project.souklab.model.UserAvatar;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -37,6 +45,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -45,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -81,6 +91,7 @@ class AvatarServiceTest {
     private TransactionTemplate transactionTemplate;
 
     private Clock clock;
+    private AvatarProperties avatarProperties;
     private AvatarService avatarService;
     private User testUser;
     private MockMultipartFile validFile;
@@ -88,6 +99,9 @@ class AvatarServiceTest {
     @BeforeEach
     void setUp() {
         clock = Clock.fixed(Instant.parse("2026-09-05T12:00:00Z"), ZoneId.of("UTC"));
+        avatarProperties = new AvatarProperties();
+        avatarProperties.setMaxPerUser(10L);
+        avatarProperties.setAllowedMimeTypes(List.of("image/jpeg", "image/png", "image/webp"));
         avatarService = new AvatarService(
                 userAvatarRepository,
                 userRepository,
@@ -96,7 +110,8 @@ class AvatarServiceTest {
                 imageProcessingService,
                 storageService,
                 transactionTemplate,
-                clock
+                clock,
+                avatarProperties
         );
 
         testUser = User.builder()
@@ -147,7 +162,7 @@ class AvatarServiceTest {
         when(userAvatarRepository.countByUserId(testUser.getId())).thenReturn(2L);
 
         ValidatedFile validatedFile = new ValidatedFile(new ByteArrayInputStream(validFile.getBytes()), "portrait.png", "image/png", validFile.getSize());
-        when(fileValidator.validateAndSanitize(any(InputStream.class), eq("portrait.png"), eq("image/png"), eq(validFile.getSize()), eq(AvatarService.AVATAR_ALLOWED_MIME_TYPES)))
+        when(fileValidator.validateAndSanitize(any(InputStream.class), eq("portrait.png"), eq("image/png"), eq(validFile.getSize()), eq(avatarProperties.getAllowedMimeTypes())))
                 .thenReturn(validatedFile);
 
         ValidatedFile scannedFile = new ValidatedFile(new ByteArrayInputStream(validFile.getBytes()), "portrait.png", "image/png", validFile.getSize());
@@ -195,7 +210,7 @@ class AvatarServiceTest {
 
         InOrder inOrder = inOrder(userAvatarRepository, fileValidator, virusScanService, imageProcessingService, storageService, transactionTemplate);
         inOrder.verify(userAvatarRepository).countByUserId(testUser.getId());
-        inOrder.verify(fileValidator).validateAndSanitize(any(), eq("portrait.png"), eq("image/png"), eq(validFile.getSize()), eq(AvatarService.AVATAR_ALLOWED_MIME_TYPES));
+        inOrder.verify(fileValidator).validateAndSanitize(any(), eq("portrait.png"), eq("image/png"), eq(validFile.getSize()), eq(avatarProperties.getAllowedMimeTypes()));
         inOrder.verify(virusScanService).scan(validatedFile);
         inOrder.verify(imageProcessingService).generateVariants(scannedFile);
         inOrder.verify(storageService, times(3)).store(any(), any(), any(), anyLong());
@@ -220,6 +235,22 @@ class AvatarServiceTest {
         verifyNoInteractions(imageProcessingService);
         verifyNoInteractions(storageService);
         verifyNoInteractions(transactionTemplate);
+    }
+
+    /**
+     * Verifies that the configured maxPerUser property on AvatarProperties is respected.
+     */
+    @Test
+    @DisplayName("uploadAvatar respects custom maxPerUser configured in AvatarProperties")
+    void uploadAvatar_whenCustomQuotaExceeded_throwsAvatarLimitExceededException() {
+        avatarProperties.setMaxPerUser(3L);
+        when(userAvatarRepository.countByUserId(testUser.getId())).thenReturn(3L);
+
+        assertThatThrownBy(() -> avatarService.uploadAvatar(testUser, validFile))
+                .isInstanceOf(AvatarLimitExceededException.class)
+                .hasMessageContaining("Maximum avatar limit of 3 reached");
+
+        verifyNoInteractions(fileValidator);
     }
 
     /**
@@ -343,5 +374,226 @@ class AvatarServiceTest {
 
         verifyNoInteractions(userAvatarRepository);
         verifyNoInteractions(fileValidator);
+    }
+
+    private UserAvatar buildMockAvatar(String id, boolean isActive) {
+        UserAvatar avatar = UserAvatar.builder()
+                .user(testUser)
+                .storageKeyOriginal("orig-" + id + ".png")
+                .storageKeyMedium("med-" + id + ".png")
+                .storageKeyThumbnail("thumb-" + id + ".png")
+                .originalFilename("avatar-" + id + ".png")
+                .contentType("image/png")
+                .fileSize(2048L)
+                .isActive(isActive)
+                .uploadedAt(LocalDateTime.now(clock))
+                .build();
+        avatar.setId(id);
+        return avatar;
+    }
+
+    @Nested
+    @DisplayName("listAvatars Tests")
+    class ListAvatarsTests {
+
+        @Test
+        @DisplayName("listAvatars returns mapped PaginatedResponse scoped to calling user")
+        void listAvatars_returnsMappedPaginatedResponse_forCallingUser() {
+            UserAvatar avatar1 = buildMockAvatar("av-1", true);
+            UserAvatar avatar2 = buildMockAvatar("av-2", false);
+
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<UserAvatar> page = new PageImpl<>(List.of(avatar1, avatar2), pageable, 2);
+
+            when(userAvatarRepository.findByUserId(testUser.getId(), pageable)).thenReturn(page);
+
+            PaginatedResponse<AvatarResponseDTO> response = avatarService.listAvatars(testUser, pageable);
+
+            assertThat(response).isNotNull();
+            assertThat(response.getContent()).hasSize(2);
+            assertThat(response.getTotalElements()).isEqualTo(2);
+            assertThat(response.getContent().get(0).getId()).isEqualTo("av-1");
+            assertThat(response.getContent().get(0).getUrlThumbnail()).isEqualTo("/api/v1/files/thumb-av-1.png");
+            assertThat(response.getContent().get(0).isActive()).isTrue();
+            assertThat(response.getContent().get(1).getId()).isEqualTo("av-2");
+            assertThat(response.getContent().get(1).isActive()).isFalse();
+
+            verify(userAvatarRepository).findByUserId(testUser.getId(), pageable);
+        }
+
+        @Test
+        @DisplayName("listAvatars throws IllegalArgumentException when currentUser is null")
+        void listAvatars_whenUserIsNull_throwsIllegalArgumentException() {
+            Pageable pageable = PageRequest.of(0, 20);
+            assertThatThrownBy(() -> avatarService.listAvatars(null, pageable))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Current user cannot be null");
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteAvatar Tests")
+    class DeleteAvatarTests {
+
+        @Test
+        @DisplayName("deleteAvatar of inactive avatar removes entity and 3 S3 keys without modifying user avatarUrl")
+        void deleteAvatar_whenInactive_deletesEntityAndS3Keys_leavesUserAvatarUrlUnchanged() {
+            UserAvatar avatar = buildMockAvatar("av-inactive", false);
+            testUser.setAvatarUrl("/api/v1/files/thumb-other.png");
+
+            when(userAvatarRepository.findByIdAndUserId("av-inactive", testUser.getId()))
+                    .thenReturn(Optional.of(avatar));
+            mockTransactionTemplateSuccess();
+
+            avatarService.deleteAvatar(testUser, "av-inactive");
+
+            verify(userAvatarRepository).delete(avatar);
+            verify(userRepository, never()).save(any());
+            assertThat(testUser.getAvatarUrl()).isEqualTo("/api/v1/files/thumb-other.png");
+
+            verify(storageService).delete("orig-av-inactive.png");
+            verify(storageService).delete("med-av-inactive.png");
+            verify(storageService).delete("thumb-av-inactive.png");
+        }
+
+        @Test
+        @DisplayName("deleteAvatar of active avatar removes entity, clears user avatarUrl to null, and deletes 3 S3 keys")
+        void deleteAvatar_whenActive_deletesEntityAndS3Keys_clearsUserAvatarUrlToNull() {
+            UserAvatar avatar = buildMockAvatar("av-active", true);
+            testUser.setAvatarUrl("/api/v1/files/thumb-av-active.png");
+
+            when(userAvatarRepository.findByIdAndUserId("av-active", testUser.getId()))
+                    .thenReturn(Optional.of(avatar));
+            mockTransactionTemplateSuccess();
+
+            avatarService.deleteAvatar(testUser, "av-active");
+
+            verify(userAvatarRepository).delete(avatar);
+            verify(userRepository).save(testUser);
+            assertThat(testUser.getAvatarUrl()).isNull();
+            verify(userAvatarRepository, never()).findByUserIdAndIsActiveTrue(any());
+
+            verify(storageService).delete("orig-av-active.png");
+            verify(storageService).delete("med-av-active.png");
+            verify(storageService).delete("thumb-av-active.png");
+        }
+
+        @Test
+        @DisplayName("deleteAvatar catches and logs storageService.delete exception without rethrowing")
+        void deleteAvatar_whenStorageDeleteThrows_doesNotRethrowAndDBAlreadyDeleted() {
+            UserAvatar avatar = buildMockAvatar("av-error", false);
+
+            when(userAvatarRepository.findByIdAndUserId("av-error", testUser.getId()))
+                    .thenReturn(Optional.of(avatar));
+            mockTransactionTemplateSuccess();
+
+            doThrow(new StorageException("S3 connection timeout"))
+                    .when(storageService).delete("med-av-error.png");
+
+            avatarService.deleteAvatar(testUser, "av-error");
+
+            verify(userAvatarRepository).delete(avatar);
+            verify(storageService).delete("orig-av-error.png");
+            verify(storageService).delete("med-av-error.png");
+            verify(storageService).delete("thumb-av-error.png");
+        }
+
+        @Test
+        @DisplayName("deleteAvatar throws ResourceNotFoundException when avatar not found or not owned")
+        void deleteAvatar_whenNotFoundOrNotOwned_throwsResourceNotFoundException() {
+            when(userAvatarRepository.findByIdAndUserId("missing-id", testUser.getId()))
+                    .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> avatarService.deleteAvatar(testUser, "missing-id"))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Avatar not found with id: missing-id");
+
+            verify(userAvatarRepository, never()).delete(any());
+            verifyNoInteractions(storageService);
+        }
+
+        @Test
+        @DisplayName("deleteAvatar throws IllegalArgumentException when currentUser is null")
+        void deleteAvatar_whenUserIsNull_throwsIllegalArgumentException() {
+            assertThatThrownBy(() -> avatarService.deleteAvatar(null, "av-1"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Current user cannot be null");
+        }
+    }
+
+    @Nested
+    @DisplayName("activateAvatar Tests")
+    class ActivateAvatarTests {
+
+        @Test
+        @DisplayName("activateAvatar of inactive avatar deactivates previous, activates target, and syncs user avatarUrl")
+        void activateAvatar_whenInactive_deactivatesPrevious_activatesTarget_andSyncsUserUrl() {
+            UserAvatar targetAvatar = buildMockAvatar("av-target", false);
+            UserAvatar previousActive = buildMockAvatar("av-prev", true);
+
+            when(userAvatarRepository.findByIdAndUserId("av-target", testUser.getId()))
+                    .thenReturn(Optional.of(targetAvatar));
+            when(userAvatarRepository.findByUserIdAndIsActiveTrue(testUser.getId()))
+                    .thenReturn(Optional.of(previousActive));
+            when(userAvatarRepository.save(any(UserAvatar.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            mockTransactionTemplateSuccess();
+
+            AvatarResponseDTO response = avatarService.activateAvatar(testUser, "av-target");
+
+            assertThat(response).isNotNull();
+            assertThat(response.getId()).isEqualTo("av-target");
+            assertThat(response.isActive()).isTrue();
+
+            assertThat(previousActive.isActive()).isFalse();
+            verify(userAvatarRepository).save(previousActive);
+
+            assertThat(targetAvatar.isActive()).isTrue();
+            verify(userAvatarRepository).save(targetAvatar);
+
+            assertThat(testUser.getAvatarUrl()).isEqualTo("/api/v1/files/thumb-av-target.png");
+            verify(userRepository).save(testUser);
+        }
+
+        @Test
+        @DisplayName("activateAvatar of already active avatar is an idempotent no-op 200 without DB writes")
+        void activateAvatar_whenAlreadyActive_isIdempotentNoOp200() {
+            UserAvatar targetAvatar = buildMockAvatar("av-already-active", true);
+
+            when(userAvatarRepository.findByIdAndUserId("av-already-active", testUser.getId()))
+                    .thenReturn(Optional.of(targetAvatar));
+
+            AvatarResponseDTO response = avatarService.activateAvatar(testUser, "av-already-active");
+
+            assertThat(response).isNotNull();
+            assertThat(response.getId()).isEqualTo("av-already-active");
+            assertThat(response.isActive()).isTrue();
+
+            verifyNoInteractions(transactionTemplate);
+            verify(userAvatarRepository, never()).findByUserIdAndIsActiveTrue(any());
+            verify(userAvatarRepository, never()).save(any());
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("activateAvatar throws ResourceNotFoundException when avatar not found or not owned")
+        void activateAvatar_whenNotFoundOrNotOwned_throwsResourceNotFoundException() {
+            when(userAvatarRepository.findByIdAndUserId("foreign-id", testUser.getId()))
+                    .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> avatarService.activateAvatar(testUser, "foreign-id"))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Avatar not found with id: foreign-id");
+
+            verify(userAvatarRepository, never()).save(any());
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("activateAvatar throws IllegalArgumentException when currentUser is null")
+        void activateAvatar_whenUserIsNull_throwsIllegalArgumentException() {
+            assertThatThrownBy(() -> avatarService.activateAvatar(null, "av-1"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Current user cannot be null");
+        }
     }
 }
