@@ -1,72 +1,186 @@
-# Souklab Backend - Production Spring Boot System
+# SoukLab Backend - Production Spring Boot Architecture
 
-Welcome to the backend architecture for **Souklab**, an enterprise-grade platform dedicated to the preservation, discovery, and commercialization of Algerian traditional crafts and craftsmanship heritage.
-
----
-
-## 🎯 Project Vision & Context
-
-Souklab connects three primary stakeholder groups:
-1. **Artisans & Master Craftsmen**: Traditional artisans (pottery, leatherwork, jewelry, weaving, woodwork, brassware, etc.) who manage their profiles, showcase portfolios, publish educational masterclasses (*formations*), post community news, and monetize their skills.
-2. **Clients & Connoisseurs**: Individuals and corporate clients seeking authentic craft products, hiring artisans for bespoke commissions, participating in workshops, and subscribing for verified artisan directories.
-3. **Administrators & Curators**: Platform managers who review and validate artisan credentials, approve workshop curricula, moderate reviews and reports, and manage catalog taxonomies.
+Enterprise-grade Spring Boot backend platform dedicated to the preservation, discovery, and commercialization of Algerian traditional crafts and craftsmanship heritage.
 
 ---
 
-## 🛠 Technology Stack
+## Architecture Overview
 
-- **Framework**: Spring Boot 3.x / 4.x (Java 17+)
-- **Data Persistence**: Spring Data JPA + MySQL 8.0 (with connection pooling via HikariCP)
-- **Full-Text Search**: Hibernate Search 8.x + Elasticsearch 8.x (Faceted multi-filter search)
-- **Security & RBAC**: Spring Security 6, Stateless JWT (HS256/RS256), Refresh Token rotation, Bucket4j Rate Limiting
-- **Realtime Communication**: Spring WebSocket (STOMP Broker) + JWT Handshake Interceptor
-- **Payment Gateway**: Chargily Pay V2 API integration (Edahabia and CIB card processing in DZD)
-- **File & Media Storage**: Local / S3-compatible storage with multi-part upload validation, PDFBox metadata handling, and ClamAV virus inspection
+SoukLab follows a decoupled layered architecture adhering to Domain-Driven Design (DDD) principles:
 
----
-
-## 📁 Documentation Suite
-
-Comprehensive technical documentation is maintained in the [`docs/`](./docs) folder:
-
-| Document | Description |
-| :--- | :--- |
-| **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** | Detailed system architecture, clean layering, security filters, STOMP WebSockets, and Elasticsearch indexing. |
-| **[`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md)** | Complete entity relational diagram, table schemas, relationships, enums, and JPA mapping rules. |
-| **[`docs/API_SPEC.md`](./docs/API_SPEC.md)** | Full REST & WebSocket API specification with request/response payloads, query parameters, and error codes. |
-| **[`docs/ROADMAP.md`](./docs/ROADMAP.md)** | Step-by-step modular implementation roadmap designed for iterative, guided development. |
-| **[`CLAUDE.md`](./CLAUDE.md)** | Developer coding standards, conventions, and common CLI commands. |
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- JDK 17 or higher
-- Maven 3.8+ (or use `./mvnw`)
-- MySQL 8.0+ running on `localhost:3306`
-- Elasticsearch 8.x running on `localhost:9200` (optional for non-search tests)
-
-### Local S3 Storage (MinIO)
-Start the local S3-compatible storage container via Docker Compose:
-```bash
-docker compose up -d minio
+```mermaid
+graph TD
+    Client["Client / Frontend / Mobile"] -->|"REST / HTTPS"| Security["Spring Security & Rate Limit Filters"]
+    Client -->|"STOMP / WSS"| WsBroker["Spring WebSocket Relay (RabbitMQ)"]
+    Security --> ControllerLayer["Controller Layer (REST Adapters)"]
+    ControllerLayer --> ServiceLayer["Service Layer (Transactional Business Logic)"]
+    ServiceLayer --> DAOLayer["DAO Layer (Spring Data JPA Repositories)"]
+    ServiceLayer --> StorageModule["File Storage Engine (S3 / MinIO / ClamAV)"]
+    ServiceLayer --> NotificationEngine["Notification Engine (In-App & STOMP Push)"]
+    DAOLayer --> Database[("MariaDB / MySQL 8.0")]
+    StorageModule --> MinIO[("MinIO S3 Bucket")]
+    StorageModule --> ClamAV["ClamAV Daemon (:3310)"]
 ```
-- **S3 API Endpoint**: `http://localhost:9000` (used by Spring Boot backend)
-- **MinIO Web Console**: `http://localhost:9001` (login: `minioadmin` / `minioadmin_secret` or configured `.env` values)
-- **Health Check**: `curl -sI http://localhost:9000/minio/health/live`
 
-### Build and Test
+---
+
+## Core Modules & Capabilities
+
+| Module | Core Responsibility | Key Technologies |
+| :--- | :--- | :--- |
+| **Authentication & RBAC** | Stateless JWT authentication, role-based authorization (`CLIENT`, `ARTISAN`, `ADMIN`), email verification codes, password reset lifecycle, OAuth2 Google login. | Spring Security 6, JJWT (HS256), BCrypt |
+| **User & Profile Management** | Artisan public profiles, profile completion wizard, contact gating based on membership/roles, profile view metrics deduplication. | Spring Data JPA, Jakarta Validation |
+| **Formateur Accreditation** | Artisan teacher certification lifecycle (submission, admin review, cooldown enforcement, direct admin grants/revocations). | Multi-state state machine, Spring Events |
+| **In-App Notifications** | User-scoped notification feeds, unread badge counters, instant WebSocket broadcast, query-scoped soft deletions. | Spring WebSocket, STOMP Relay, JPA Soft Delete |
+| **File Storage & Avatars** | Multi-tier avatar processing (thumbnail, medium, full), magic number verification, ClamAV streaming antivirus, S3/MinIO bucket storage. | MinIO S3 SDK, Thumbnailator, Clamd instream |
+| **Rate Limiting & Security** | Token-bucket sliding window rate limiting on authentication and avatar uploads, cache-backed with Caffeine. | Bucket4j, Caffeine Cache, OncePerRequestFilter |
+
+---
+
+## Technology Stack
+
+- **Runtime & Language**: Java 17+, Spring Boot 3.2+
+- **Data Persistence**: Spring Data JPA + Hibernate 6 + MariaDB / MySQL 8.0
+- **Connection Pool**: HikariCP (configured with leak detection and connection pooling)
+- **Object Storage**: S3-compatible object store (MinIO for local development, AWS S3 / Cloudflare R2 for production)
+- **Security & Antivirus**: Spring Security, JJWT, Bucket4j, ClamAV Daemon
+- **Realtime Broker**: Spring WebSocket STOMP relay (RabbitMQ)
+- **Build & Quality Tooling**: Maven Wrapper (`./mvnw`), Lombok, JaCoCo, Postman / Newman
+
+---
+
+## Repository Package Structure
+
+```
+src/main/java/com/project/souklab/
+├── config/              # Infrastructure and cross-cutting framework beans
+├── controller/          # REST API entrypoints and HTTP adapters
+│   ├── artisan/         # Artisan profile endpoints
+│   ├── auth/            # Registration, login, verification, and password flows
+│   ├── formateur/       # Formateur accreditation and moderation endpoints
+│   ├── notification/    # Notification feed and read-state management
+│   └── user/            # User avatar upload/activation and admin moderation
+├── dao/                 # Spring Data JPA repositories
+├── dto/                 # Data Transfer Objects (contracts for API requests/responses)
+│   ├── admin/           # Administrative audit representations
+│   ├── auth/            # Login, registration, token refresh, and password DTOs
+│   ├── common/          # Standard response envelopes (ApiResponse, PaginatedResponse)
+│   ├── formateur/       # Formateur request and moderation DTOs
+│   ├── notification/    # Notification payload representations
+│   ├── profile/         # Artisan and client profile representations
+│   └── user/            # Moderation requests and avatar responses
+├── exception/           # Exception hierarchy and GlobalExceptionHandler
+├── filestorage/         # Dedicated object storage engine
+│   ├── config/          # MinIO/S3 connection properties
+│   ├── controller/      # Direct file streaming endpoints
+│   ├── exception/       # File storage exception taxonomy
+│   ├── image/           # Image resizing and thumbnailing service
+│   ├── s3/              # S3/MinIO service implementation
+│   ├── scan/            # ClamAV virus scanning integration
+│   ├── security/        # File serving rate limit filter
+│   ├── stub/            # In-memory test stubs
+│   └── validation/      # Magic bytes and MIME validation
+├── model/               # JPA entities and domain enums
+├── security/            # Security filters (JWT, rate limiting, upload boundaries)
+├── service/             # Application business logic and transactional services
+│   ├── artisan/         # Artisan profile business operations
+│   ├── audit/           # Audit trail logging
+│   ├── auth/            # User authentication and details management
+│   ├── formateur/       # Formateur accreditation workflows
+│   ├── notification/    # In-app notifications and WebSocket dispatch
+│   ├── security/        # Token issuance and verification
+│   └── user/            # User management and avatar processing
+├── util/                # Stateless utility functions and mappers
+└── validation/          # Custom Jakarta Bean Validation constraints
+```
+
+---
+
+## Getting Started
+
+### 1. Prerequisites
+- JDK 17 or higher
+- Docker & Docker Compose
+- Maven 3.8+ (or use repository `./mvnw`)
+
+### 2. Infrastructure Setup
+Launch local infrastructure containers:
 ```bash
-# Clean and compile
-./mvnw clean compile
+docker compose up -d mariadb minio rabbitmq clamav
+```
 
-# Run tests
-./mvnw test
+Service endpoints:
+- **MariaDB**: `localhost:3306` (Database: `souklab_db`)
+- **MinIO S3**: `http://localhost:9000` (Console: `http://localhost:9001`)
+- **RabbitMQ**: `localhost:5672` (Management: `http://localhost:15672`)
+- **ClamAV**: `localhost:3310`
 
-# Package application
-./mvnw clean package -DskipTests
+### 3. Build & Run
+```bash
+# Compile and test
+./mvnw clean test
 
-# Run Spring Boot dev server
+# Run development server
 ./mvnw spring-boot:run
 ```
+
+The server listens on `http://localhost:8080/api/v1`.
+
+---
+
+## API Documentation & Testing Suite
+
+- **API Specification**: See [`docs/API_SPEC.md`](docs/API_SPEC.md) for full endpoint references.
+- **Postman API Reference**: Exhaustive contracts documented in [`docs/POSTMAN_API_REFERENCE.md`](docs/POSTMAN_API_REFERENCE.md).
+- **Postman Test Suite**: Located in [`.postman/souklab.postman_collection.json`](.postman/souklab.postman_collection.json).
+  To run the automated Newman verification:
+  ```bash
+  npx newman run .postman/souklab.postman_collection.json -e .postman/souklab.postman_environment.json
+  ```
+
+---
+
+## Package Documentation Directory
+
+Each individual package across the application contains its own dedicated `README.md` specifying internal classes, contracts, and architecture:
+
+- [`com.project.souklab`](src/main/java/com/project/souklab/README.md) — Application root
+- [`com.project.souklab.config`](src/main/java/com/project/souklab/config/README.md) — Framework configuration
+- [`com.project.souklab.controller`](src/main/java/com/project/souklab/controller/README.md) — Controller layer overview
+  - [`controller.artisan`](src/main/java/com/project/souklab/controller/artisan/README.md) — Artisan profile endpoints
+  - [`controller.auth`](src/main/java/com/project/souklab/controller/auth/README.md) — Authentication endpoints
+  - [`controller.formateur`](src/main/java/com/project/souklab/controller/formateur/README.md) — Formateur accreditation endpoints
+  - [`controller.notification`](src/main/java/com/project/souklab/controller/notification/README.md) — Notification endpoints
+  - [`controller.user`](src/main/java/com/project/souklab/controller/user/README.md) — User and avatar endpoints
+- [`com.project.souklab.dao`](src/main/java/com/project/souklab/dao/README.md) — Persistence repositories
+- [`com.project.souklab.dto`](src/main/java/com/project/souklab/dto/README.md) — DTO taxonomy
+  - [`dto.admin`](src/main/java/com/project/souklab/dto/admin/README.md) — Admin audit DTOs
+  - [`dto.auth`](src/main/java/com/project/souklab/dto/auth/README.md) — Authentication DTOs
+  - [`dto.common`](src/main/java/com/project/souklab/dto/common/README.md) — Response envelopes
+  - [`dto.formateur`](src/main/java/com/project/souklab/dto/formateur/README.md) — Formateur DTOs
+  - [`dto.notification`](src/main/java/com/project/souklab/dto/notification/README.md) — Notification DTOs
+  - [`dto.profile`](src/main/java/com/project/souklab/dto/profile/README.md) — Profile representations
+  - [`dto.user`](src/main/java/com/project/souklab/dto/user/README.md) — User and avatar DTOs
+- [`com.project.souklab.exception`](src/main/java/com/project/souklab/exception/README.md) — Exception handling
+- [`com.project.souklab.filestorage`](src/main/java/com/project/souklab/filestorage/README.md) — Storage engine
+  - [`filestorage.config`](src/main/java/com/project/souklab/filestorage/config/README.md) — S3 configuration
+  - [`filestorage.controller`](src/main/java/com/project/souklab/filestorage/controller/README.md) — File streaming controller
+  - [`filestorage.exception`](src/main/java/com/project/souklab/filestorage/exception/README.md) — Storage exceptions
+  - [`filestorage.image`](src/main/java/com/project/souklab/filestorage/image/README.md) — Image processing service
+  - [`filestorage.s3`](src/main/java/com/project/souklab/filestorage/s3/README.md) — MinIO/S3 client
+  - [`filestorage.scan`](src/main/java/com/project/souklab/filestorage/scan/README.md) — ClamAV scanner
+  - [`filestorage.security`](src/main/java/com/project/souklab/filestorage/security/README.md) — Download rate limiting
+  - [`filestorage.stub`](src/main/java/com/project/souklab/filestorage/stub/README.md) — In-memory test stubs
+  - [`filestorage.validation`](src/main/java/com/project/souklab/filestorage/validation/README.md) — File validation
+- [`com.project.souklab.model`](src/main/java/com/project/souklab/model/README.md) — Domain entities and enums
+- [`com.project.souklab.security`](src/main/java/com/project/souklab/security/README.md) — Security filters and token parsing
+- [`com.project.souklab.service`](src/main/java/com/project/souklab/service/README.md) — Service layer architecture
+  - [`service.artisan`](src/main/java/com/project/souklab/service/artisan/README.md) — Artisan profile services
+  - [`service.audit`](src/main/java/com/project/souklab/service/audit/README.md) — Audit trail logging
+  - [`service.auth`](src/main/java/com/project/souklab/service/auth/README.md) — Authentication workflows
+  - [`service.formateur`](src/main/java/com/project/souklab/service/formateur/README.md) — Formateur management
+  - [`service.notification`](src/main/java/com/project/souklab/service/notification/README.md) — Notification dispatcher
+  - [`service.security`](src/main/java/com/project/souklab/service/security/README.md) — Token and verification services
+  - [`service.user`](src/main/java/com/project/souklab/service/user/README.md) — User moderation and avatars
+- [`com.project.souklab.util`](src/main/java/com/project/souklab/util/README.md) — Helper utilities
+- [`com.project.souklab.validation`](src/main/java/com/project/souklab/validation/README.md) — Custom validator annotations

@@ -1,0 +1,29 @@
+# Notification Service Package (`com.project.souklab.service.notification`)
+
+Coordinates in-app notification records, badge counters, and realtime WebSocket push dispatch.
+
+---
+
+## Dual-Dispatch Mechanism
+
+```mermaid
+sequenceDiagram
+    participant Domain as Domain Service
+    participant NotifService as NotificationService
+    participant DB as MariaDB (JPA)
+    participant STOMP as SimpMessagingTemplate (RabbitMQ)
+    participant Client as Web/Mobile Client (STOMP)
+
+    Domain->>NotifService: createForUser(recipient, message, type, targetId)
+    NotifService->>DB: save(Notification)
+    NotifService->>STOMP: convertAndSendToUser(recipientEmail, "/queue/notifications", DTO)
+    STOMP-->>Client: Realtime Push Notification
+```
+
+---
+
+## Classes Reference
+
+| Service Class | Responsibility |
+| :--- | :--- |
+| [`NotificationService`](NotificationService.java) | Handles notification persistence, paginated feeds excluding soft-deleted items (`deletedAt IS NULL`), raw unread counts, query-scoped mark-read, bulk mark-all-read, and soft-delete updates. |
