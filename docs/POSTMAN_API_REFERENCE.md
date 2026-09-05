@@ -123,6 +123,29 @@ This document provides the exhaustive specification for all requests, headers, r
     "refreshToken": "7f708074-43f0-4cdc-a5f2-160ebd833908",
     "tokenType": "Bearer",
     "expiresIn": 3600,
+    "user": {
+      "id": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
+      "email": "user@souklab.dz",
+      "firstName": "Yacine",
+      "lastName": "Brahimi",
+      "name": "Yacine Brahimi",
+      "phone": null,
+      "avatarUrl": null,
+      "accountStatus": "ACTIVE",
+      "roles": [
+        "ROLE_CLIENT"
+      ],
+      "emailVerified": true,
+      "emailVerifiedAt": "2026-09-03T20:00:00",
+      "createdAt": "2026-09-03T20:00:00",
+      "updatedAt": "2026-09-03T20:00:00",
+      "clientType": "INDIVIDUAL",
+      "companyName": null,
+      "bio": null,
+      "address": null,
+      "regionId": null,
+      "city": null
+    },
     "roles": [
       "ROLE_CLIENT"
     ]
@@ -421,6 +444,34 @@ This document provides the exhaustive specification for all requests, headers, r
     "refreshToken": "7f708074-43f0-4cdc-a5f2-160ebd833908",
     "tokenType": "Bearer",
     "expiresIn": 3600,
+    "user": {
+      "id": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
+      "email": "user@souklab.dz",
+      "firstName": "Karim",
+      "lastName": "Ziani",
+      "name": "Karim Ziani",
+      "phone": null,
+      "avatarUrl": null,
+      "accountStatus": "PENDING",
+      "roles": [
+        "ROLE_ARTISAN"
+      ],
+      "emailVerified": true,
+      "emailVerifiedAt": "2026-09-03T20:00:00",
+      "createdAt": "2026-09-03T20:00:00",
+      "updatedAt": "2026-09-03T20:00:00",
+      "bio": null,
+      "regionId": null,
+      "city": null,
+      "address": null,
+      "website": null,
+      "subCategoryId": null,
+      "teacher": false,
+      "verified": false,
+      "premium": false,
+      "rating": 0.0,
+      "reviewsCount": 0
+    },
     "roles": [
       "ROLE_ARTISAN"
     ]

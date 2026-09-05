@@ -2870,7 +2870,7 @@
                   "    pm.expect(json.code).to.eql(201);",
                   "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualClientEmail\"));",
                   "    pm.expect(json.data.emailVerified).to.be.false;",
-                  "    pm.expect(json.data.status).to.eql(\"ACTIVE\");",
+                  "    pm.expect(json.data.accountStatus).to.eql(\"ACTIVE\");",
                   "});",
                   "pm.environment.set(\"manualClientId\", json.data.id);"
                 ]
@@ -3091,10 +3091,10 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test(\"Client profile confirms emailVerified == true and status == ACTIVE\", function () {",
+                  "pm.test(\"Client profile confirms emailVerified == true and accountStatus == ACTIVE\", function () {",
                   "    pm.expect(json.data.emailVerified).to.be.true;",
                   "    pm.expect(json.data.emailVerifiedAt).to.not.be.null;",
-                  "    pm.expect(json.data.status).to.eql(\"ACTIVE\");",
+                  "    pm.expect(json.data.accountStatus).to.eql(\"ACTIVE\");",
                   "});"
                 ]
               }
@@ -3151,12 +3151,12 @@
                   "    pm.response.to.have.status(201);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test(\"Registration response envelope confirms initial PENDING status\", function () {",
+                  "pm.test(\"Registration response envelope confirms initial PENDING accountStatus\", function () {",
                   "    pm.expect(json.success).to.be.true;",
                   "    pm.expect(json.code).to.eql(201);",
                   "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualArtisanEmail\"));",
                   "    pm.expect(json.data.emailVerified).to.be.false;",
-                  "    pm.expect(json.data.status).to.eql(\"PENDING\");",
+                  "    pm.expect(json.data.accountStatus).to.eql(\"PENDING\");",
                   "});",
                   "pm.environment.set(\"manualArtisanId\", json.data.id);"
                 ]
@@ -3372,10 +3372,10 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test(\"Artisan profile confirms emailVerified == true and status == PENDING\", function () {",
+                  "pm.test(\"Artisan profile confirms emailVerified == true and accountStatus == PENDING\", function () {",
                   "    pm.expect(json.data.emailVerified).to.be.true;",
                   "    pm.expect(json.data.emailVerifiedAt).to.not.be.null;",
-                  "    pm.expect(json.data.status).to.eql(\"PENDING\");",
+                  "    pm.expect(json.data.accountStatus).to.eql(\"PENDING\");",
                   "});"
                 ]
               }
@@ -4364,13 +4364,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/auth/refresh-token",
+              "raw": "{{baseUrl}}/auth/refresh",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "auth",
-                "refresh-token"
+                "refresh"
               ]
             },
             "body": {
@@ -4454,7 +4454,7 @@
                   "    pm.expect(json.code).to.eql(200);",
                   "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
                   "    pm.expect(json.data.refreshToken).to.be.a(\"string\");",
-                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualClientEmail\"));",
+                  "    pm.expect(json.data.user.email).to.eql(pm.environment.get(\"manualClientEmail\"));",
                   "});",
                   "pm.environment.set(\"manualClientPassword\", pm.environment.get(\"manualClientNewPassword\"));",
                   "pm.environment.set(\"manualClientToken\", json.data.accessToken);",

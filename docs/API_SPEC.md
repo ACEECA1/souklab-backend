@@ -102,21 +102,44 @@ Authenticates credentials and returns JWT access + refresh tokens.
 ```json
 {
   "success": true,
-  "message": "Authentication successful",
+  "code": 200,
+  "message": "Login successful.",
   "data": {
     "accessToken": "eyJhbGciOi...",
     "refreshToken": "7c9e6679-7425...",
     "tokenType": "Bearer",
     "expiresIn": 3600,
     "user": {
-      "id": "uuid-123",
+      "id": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
       "email": "artisan@example.com",
+      "firstName": "Ahmed",
+      "lastName": "Benali",
       "name": "Ahmed Benali",
-      "role": "ROLE_ARTISAN",
+      "phone": "+213 555 12 34 56",
+      "avatarUrl": null,
       "accountStatus": "PENDING",
-      "isPremium": false,
-      "isValidated": false
-    }
+      "roles": [
+        "ROLE_ARTISAN"
+      ],
+      "emailVerified": true,
+      "emailVerifiedAt": "2026-09-01T10:00:00",
+      "createdAt": "2026-09-01T10:00:00",
+      "updatedAt": "2026-09-01T10:00:00",
+      "bio": "Master ceramist specializing in traditional Kabyle and Islamic motifs.",
+      "regionId": "reg-15",
+      "city": "Tizi Ouzou",
+      "address": "Route des Artisans, No. 12",
+      "website": "https://artisan-example.dz",
+      "subCategoryId": "subcat-pottery-01",
+      "teacher": false,
+      "verified": false,
+      "premium": false,
+      "rating": 0.0,
+      "reviewsCount": 0
+    },
+    "roles": [
+      "ROLE_ARTISAN"
+    ]
   }
 }
 ```
