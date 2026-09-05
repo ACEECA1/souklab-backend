@@ -2839,6 +2839,1664 @@
       ]
     },
     {
+      "name": "Email-Dependent Flows (Manual)",
+      "item": [
+        {
+          "name": "01. Client \u2014 Register Throwaway Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"manualClientEmail\") || pm.environment.get(\"manualClientEmail\").trim() === \"\" || pm.environment.get(\"manualClientEmail\") === \"manual.client@souklab.dz\") {",
+                  "    pm.environment.set(\"manualClientEmail\", `manual.client.${Date.now()}@souklab.dz`);",
+                  "}",
+                  "pm.environment.set(\"manualClientPassword\", \"ClientPass123!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for manual client\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Registration response envelope is valid\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(201);",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualClientEmail\"));",
+                  "    pm.expect(json.data.emailVerified).to.be.false;",
+                  "    pm.expect(json.data.status).to.eql(\"ACTIVE\");",
+                  "});",
+                  "pm.environment.set(\"manualClientId\", json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Manual\",\n  \"lastName\": \"Client\",\n  \"email\": \"{{manualClientEmail}}\",\n  \"password\": \"{{manualClientPassword}}\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02. Client \u2014 Verify Email with Wrong Code (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request for invalid verification code\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error envelope returns invalid or expired code message\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"code\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03. Client \u2014 Verify Email (Manual Checkpoint)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.environment.get(\"manualVerificationCode\");",
+                  "if (!code || code === \"PASTE_CODE_HERE\" || code.trim() === \"\") {",
+                  "    console.warn(\"MANUAL CHECKPOINT: set the code in your environment, then re-run this request.\");",
+                  "    pm.execution.setNextRequest(null);",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for successful email verification\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Response confirms email verified successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"Email verified successfully.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"code\": \"{{manualVerificationCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04. Client \u2014 Login to Inspect Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for client login\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tokens returned in response\", function () {",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "    pm.expect(json.data.refreshToken).to.be.a(\"string\");",
+                  "});",
+                  "pm.environment.set(\"manualClientToken\", json.data.accessToken);",
+                  "pm.environment.set(\"manualClientRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"password\": \"{{manualClientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05. Client \u2014 Get Me Confirms Verified & ACTIVE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for client me endpoint\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Client profile confirms emailVerified == true and status == ACTIVE\", function () {",
+                  "    pm.expect(json.data.emailVerified).to.be.true;",
+                  "    pm.expect(json.data.emailVerifiedAt).to.not.be.null;",
+                  "    pm.expect(json.data.status).to.eql(\"ACTIVE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{manualClientToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06. Artisan \u2014 Register Throwaway Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"manualArtisanEmail\") || pm.environment.get(\"manualArtisanEmail\").trim() === \"\" || pm.environment.get(\"manualArtisanEmail\") === \"manual.artisan@souklab.dz\") {",
+                  "    pm.environment.set(\"manualArtisanEmail\", `manual.artisan.${Date.now()}@souklab.dz`);",
+                  "}",
+                  "pm.environment.set(\"manualArtisanPassword\", \"ArtisanPass123!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for manual artisan\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Registration response envelope confirms initial PENDING status\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(201);",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualArtisanEmail\"));",
+                  "    pm.expect(json.data.emailVerified).to.be.false;",
+                  "    pm.expect(json.data.status).to.eql(\"PENDING\");",
+                  "});",
+                  "pm.environment.set(\"manualArtisanId\", json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Manual\",\n  \"lastName\": \"Artisan\",\n  \"email\": \"{{manualArtisanEmail}}\",\n  \"password\": \"{{manualArtisanPassword}}\",\n  \"role\": \"ARTISAN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07. Artisan \u2014 Verify Email with Wrong Code (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request for artisan wrong code\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualArtisanEmail}}\",\n  \"code\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08. Artisan \u2014 Verify Email (Manual Checkpoint)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.environment.get(\"manualVerificationCode\");",
+                  "if (!code || code === \"PASTE_CODE_HERE\" || code.trim() === \"\") {",
+                  "    console.warn(\"MANUAL CHECKPOINT: set the code in your environment, then re-run this request.\");",
+                  "    pm.execution.setNextRequest(null);",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for artisan email verification\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Response confirms artisan email verified successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"Email verified successfully.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualArtisanEmail}}\",\n  \"code\": \"{{manualVerificationCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09. Artisan \u2014 Login to Inspect Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for artisan login\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set(\"manualArtisanToken\", json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualArtisanEmail}}\",\n  \"password\": \"{{manualArtisanPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10. Artisan \u2014 Get Me Confirms Verified & PENDING",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for artisan me endpoint\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Artisan profile confirms emailVerified == true and status == PENDING\", function () {",
+                  "    pm.expect(json.data.emailVerified).to.be.true;",
+                  "    pm.expect(json.data.emailVerifiedAt).to.not.be.null;",
+                  "    pm.expect(json.data.status).to.eql(\"PENDING\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{manualArtisanToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11. Lockout \u2014 Register Dedicated User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"manualLockoutEmail\", `manual.lockout.${ts}@souklab.dz`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for lockout user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Lockout\",\n  \"lastName\": \"User\",\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"password\": \"LockoutPass123!\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12. Lockout \u2014 Attempt 1 with Wrong Code (400 Invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 1)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 1 message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"111111\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13. Lockout \u2014 Attempt 2 with Wrong Code (400 Invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 2)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 2 message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"222222\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14. Lockout \u2014 Attempt 3 with Wrong Code (400 Invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 3)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 3 message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"333333\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15. Lockout \u2014 Attempt 4 with Wrong Code (400 Invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 4)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 4 message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"444444\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16. Lockout \u2014 Attempt 5 Triggers Lockout (400 Max Attempts)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 5 - Lockout)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 5 message is Maximum attempts exceeded\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Maximum attempts exceeded. Please request a new code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"555555\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17. Lockout \u2014 Attempt 6 Proves Token Remains Locked (400 Max Attempts)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request (Attempt 6 - Locked)\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Attempt 6 remains locked with Maximum attempts exceeded\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Maximum attempts exceeded. Please request a new code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"666666\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "18. Resend \u2014 Request New Code on Locked Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for resend verification\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Generic recovery message returned for resend\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"If an unverified account exists for this email, a verification code has been sent.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "19. Resend \u2014 Submit Previously Locked Code Proves Invalidation (400 Invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request for old invalidated code\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Old code fails as Invalid or expired code (not lockout)\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"555555\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "20. Resend \u2014 Verify with New Code (Manual Checkpoint)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.environment.get(\"manualVerificationCode\");",
+                  "if (!code || code === \"PASTE_CODE_HERE\" || code.trim() === \"\") {",
+                  "    console.warn(\"MANUAL CHECKPOINT: set the code in your environment, then re-run this request.\");",
+                  "    pm.execution.setNextRequest(null);",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for newly issued verification code\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Verification succeeds with fresh attempts counter\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"Email verified successfully.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualLockoutEmail}}\",\n  \"code\": \"{{manualVerificationCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "21. Resend \u2014 Enumeration Safety for Non-Existent Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for non-existent email resend\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Anti-enumeration response returned for non-existent email\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"If an unverified account exists for this email, a verification code has been sent.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nonexistent.user.12345@souklab.dz\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "22. Resend \u2014 Enumeration Safety for Already-Verified Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for already-verified email resend\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Anti-enumeration response returned for already-verified email\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"If an unverified account exists for this email, a verification code has been sent.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "23. Password Reset \u2014 Capture Active Refresh Token Pre-Reset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for login prior to password reset\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.data.refreshToken).to.be.a(\"string\");",
+                  "pm.environment.set(\"manualPreResetRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"password\": \"{{manualClientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "24. Password Reset \u2014 Request Reset Code (Forgot Password)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for forgot password request\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Generic recovery instructions message returned\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"If an account exists for this email, instructions have been sent.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "25. Password Reset \u2014 Enumeration Safety for Non-Existent Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for non-existent email forgot password\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Generic recovery instructions message returned\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"If an account exists for this email, instructions have been sent.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ghost.user.99999@souklab.dz\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "26. Password Reset \u2014 Submit Wrong Code (400 Invalid)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"manualClientNewPassword\", \"NewClientPass456!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request for invalid reset code\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error message is Invalid or expired code.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "    pm.expect(json.message).to.eql(\"Invalid or expired code.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"code\": \"000000\",\n  \"newPassword\": \"NewClientPass456!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "27. Password Reset \u2014 Reset with Valid Code (Manual Checkpoint)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.environment.get(\"manualResetCode\");",
+                  "if (!code || code === \"PASTE_CODE_HERE\" || code.trim() === \"\") {",
+                  "    console.warn(\"MANUAL CHECKPOINT: set the code in your environment, then re-run this request.\");",
+                  "    pm.execution.setNextRequest(null);",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for successful password reset\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Response confirms password reset successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.message).to.eql(\"Password reset successfully. You can now log in with your new password.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"code\": \"{{manualResetCode}}\",\n  \"newPassword\": \"{{manualClientNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "28. Password Reset \u2014 Prove Pre-Reset Refresh Token Revoked (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for revoked refresh token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Response confirms Invalid refresh token.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid refresh token.\");",
+                  "});",
+                  "pm.test(\"No new tokens issued on revoked token reuse\", function () {",
+                  "    pm.expect(json.data).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{manualPreResetRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "29. Password Reset \u2014 Login with Old Password Fails (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized with old password after reset\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Old password rejected with Invalid email or password.\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid email or password.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"password\": \"{{manualClientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "30. Password Reset \u2014 Login with New Password Succeeds (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for login with new password\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tokens issued for new password credentials\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "    pm.expect(json.data.refreshToken).to.be.a(\"string\");",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"manualClientEmail\"));",
+                  "});",
+                  "pm.environment.set(\"manualClientPassword\", pm.environment.get(\"manualClientNewPassword\"));",
+                  "pm.environment.set(\"manualClientToken\", json.data.accessToken);",
+                  "pm.environment.set(\"manualClientRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{manualClientEmail}}\",\n  \"password\": \"{{manualClientNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Notifications",
       "description": "Notification lifecycle: paginated retrieval, unread count badge, single mark-as-read, bulk mark-all-as-read, and single deletion.",
       "item": [
