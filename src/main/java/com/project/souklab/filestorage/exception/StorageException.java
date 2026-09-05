@@ -1,27 +1,36 @@
 package com.project.souklab.filestorage.exception;
 
-import com.project.souklab.exception.AppException;
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 /**
  * Base domain exception for all file storage operations.
- * Integrates directly with Souklab's existing AppException hierarchy and ApiResponse envelope conventions.
+ * Encapsulates an HTTP status and machine-readable error code for API error reporting.
  */
-public class StorageException extends AppException {
+@Getter
+public class StorageException extends RuntimeException {
+
+    private final HttpStatus status;
+    private final String errorCode;
 
     public StorageException(HttpStatus status, String errorCode, String message) {
-        super(status, errorCode, message);
+        super(message);
+        this.status = status;
+        this.errorCode = errorCode;
     }
 
     public StorageException(HttpStatus status, String errorCode, String message, Throwable cause) {
-        super(status, errorCode, message, cause);
+        super(message, cause);
+        this.status = status;
+        this.errorCode = errorCode;
     }
 
     public StorageException(String message) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_ERROR", message);
+        this(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_ERROR", message);
     }
 
     public StorageException(String message, Throwable cause) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_ERROR", message, cause);
+        this(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_ERROR", message, cause);
     }
 }
+

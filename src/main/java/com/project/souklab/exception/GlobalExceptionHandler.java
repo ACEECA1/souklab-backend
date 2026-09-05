@@ -1,6 +1,7 @@
 package com.project.souklab.exception;
 
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.filestorage.exception.StorageException;
 import com.project.souklab.filestorage.exception.VirusDetectedException;
 import com.project.souklab.filestorage.exception.VirusScanException;
 import com.project.souklab.util.SecurityUtils;
@@ -59,6 +60,16 @@ public class GlobalExceptionHandler {
         log.error("VirusScanException [VIRUS_SCAN_UNAVAILABLE]: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ApiResponse.error("VIRUS_SCAN_UNAVAILABLE", ex.getMessage()));
+    }
+
+    /**
+     * Handles file storage domain exceptions, mapping encapsulated status and error code to ApiResponse.
+     */
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStorageException(StorageException ex) {
+        log.warn("StorageException [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
     }
 
     /**
