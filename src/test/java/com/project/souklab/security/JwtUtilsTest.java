@@ -1,0 +1,247 @@
+package com.project.souklab.security;
+
+import com.project.souklab.config.AppProperties;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.security.Key;
+import java.util.Date;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/**
+ * Unit tests verifying JWT generation, claim parsing, signature validation,
+ * and error branch handling in JwtUtils.
+ */
+@ExtendWith(MockitoExtension.class)
+class JwtUtilsTest {
+
+    private static final String TEST_SECRET = "testSecretKeyWithMinimumLengthOfThirtyTwoBytes256BitsRequired!";
+    private static final long ACCESS_TOKEN_EXPIRATION_MS = 3600000L;
+    private static final long REFRESH_TOKEN_EXPIRATION_MS = 86400000L;
+
+    private JwtUtils jwtUtils;
+    private AppProperties appProperties;
+
+    @BeforeEach
+    void setUp() {
+        appProperties = new AppProperties();
+        appProperties.getJwt().setSecret(TEST_SECRET);
+        appProperties.getJwt().setAccessTokenExpirationMs(ACCESS_TOKEN_EXPIRATION_MS);
+        appProperties.getJwt().setRefreshTokenExpirationMs(REFRESH_TOKEN_EXPIRATION_MS);
+
+        jwtUtils = new JwtUtils(appProperties);
+    }
+
+    /**
+     * Verifies that generateAccessToken creates a valid signed JWT for a valid UserDetails principal.
+     */
+    @Test
+    @DisplayName("generateAccessToken with UserDetails principal creates valid token with expected subject and expiration")
+    void generateAccessToken_withUserDetailsPrincipal_shouldCreateValidToken() {
+        UserDetails userDetails = mock(UserDetails.class);
+        when(userDetails.getUsername()).thenReturn("artisan@example.com");
+
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+
+        String token = jwtUtils.generateAccessToken(authentication);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtUtils.validateJwtToken(token)).isTrue();
+        assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo("artisan@example.com");
+
+        Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        assertThat(claims.getSubject()).isEqualTo("artisan@example.com");
+        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
+        assertThat(durationMs).isEqualTo(ACCESS_TOKEN_EXPIRATION_MS);
+    }
+
+    /**
+     * Verifies that generateAccessToken throws IllegalArgumentException when principal is null.
+     */
+    @Test
+    @DisplayName("generateAccessToken with null principal throws IllegalArgumentException")
+    void generateAccessToken_withNullPrincipal_shouldThrowIllegalArgumentException() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(null);
+
+        assertThatThrownBy(() -> jwtUtils.generateAccessToken(authentication))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Expected principal of type UserDetails, but found: null");
+    }
+
+    /**
+     * Verifies that generateAccessToken creates a valid signed JWT when invoked directly with a username string.
+     */
+    @Test
+    @DisplayName("generateAccessToken with username string creates valid token with expected subject and expiration")
+    void generateAccessToken_withUsernameString_shouldCreateValidToken() {
+        String username = "directuser@example.com";
+
+        String token = jwtUtils.generateAccessToken(username);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtUtils.validateJwtToken(token)).isTrue();
+        assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo(username);
+
+        Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        assertThat(claims.getSubject()).isEqualTo(username);
+        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
+        assertThat(durationMs).isEqualTo(ACCESS_TOKEN_EXPIRATION_MS);
+    }
+
+    /**
+     * Verifies that generateRefreshToken creates a valid signed JWT for a valid UserDetails principal.
+     */
+    @Test
+    @DisplayName("generateRefreshToken with UserDetails principal creates valid token with refresh expiration")
+    void generateRefreshToken_withUserDetailsPrincipal_shouldCreateValidToken() {
+        UserDetails userDetails = mock(UserDetails.class);
+        when(userDetails.getUsername()).thenReturn("refresh@example.com");
+
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+
+        String token = jwtUtils.generateRefreshToken(authentication);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtUtils.validateJwtToken(token)).isTrue();
+        assertThat(jwtUtils.getUserNameFromJwtToken(token)).isEqualTo("refresh@example.com");
+
+        Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        assertThat(claims.getSubject()).isEqualTo("refresh@example.com");
+        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
+        assertThat(durationMs).isEqualTo(REFRESH_TOKEN_EXPIRATION_MS);
+    }
+
+    /**
+     * Verifies that generateRefreshToken throws IllegalArgumentException when principal is null.
+     */
+    @Test
+    @DisplayName("generateRefreshToken with null principal throws IllegalArgumentException")
+    void generateRefreshToken_withNullPrincipal_shouldThrowIllegalArgumentException() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(null);
+
+        assertThatThrownBy(() -> jwtUtils.generateRefreshToken(authentication))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Expected principal of type UserDetails, but found: null");
+    }
+
+    /**
+     * Verifies round-trip claim extraction using getUserNameFromJwtToken.
+     */
+    @Test
+    @DisplayName("getUserNameFromJwtToken extracts subject matching token owner")
+    void getUserNameFromJwtToken_withValidToken_shouldReturnSubject() {
+        String token = jwtUtils.generateTokenFromUsername("claimsubject@example.com", 60000L);
+
+        String username = jwtUtils.getUserNameFromJwtToken(token);
+
+        assertThat(username).isEqualTo("claimsubject@example.com");
+    }
+
+    /**
+     * Verifies that validateJwtToken returns true for a newly issued valid token.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns true for valid token")
+    void validateJwtToken_withValidToken_shouldReturnTrue() {
+        String token = jwtUtils.generateAccessToken("valid@example.com");
+
+        boolean isValid = jwtUtils.validateJwtToken(token);
+
+        assertThat(isValid).isTrue();
+    }
+
+    /**
+     * Verifies that validateJwtToken catches SecurityException and returns false when signature is invalid.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns false when token was signed with different key")
+    void validateJwtToken_withDifferentKeySignature_shouldReturnFalse() {
+        Key foreignKey = Keys.hmacShaKeyFor("differentSecretKeyAlsoAtLeastThirtyTwoBytesLength!".getBytes());
+        String forgedToken = Jwts.builder()
+                .setSubject("attacker@example.com")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 60000L))
+                .signWith(foreignKey, SignatureAlgorithm.HS256)
+                .compact();
+
+        boolean isValid = jwtUtils.validateJwtToken(forgedToken);
+
+        assertThat(isValid).isFalse();
+    }
+
+    /**
+     * Verifies that validateJwtToken catches MalformedJwtException and returns false for malformed tokens.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns false for malformed token string")
+    void validateJwtToken_withMalformedToken_shouldReturnFalse() {
+        boolean isValid = jwtUtils.validateJwtToken("not.a.valid.jwt.structure");
+
+        assertThat(isValid).isFalse();
+    }
+
+    /**
+     * Verifies that validateJwtToken catches ExpiredJwtException and returns false for expired tokens.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns false for expired token")
+    void validateJwtToken_withExpiredToken_shouldReturnFalse() {
+        Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
+        String expiredToken = Jwts.builder()
+                .setSubject("expired@example.com")
+                .setIssuedAt(new Date(System.currentTimeMillis() - 120000L))
+                .setExpiration(new Date(System.currentTimeMillis() - 60000L))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+
+        boolean isValid = jwtUtils.validateJwtToken(expiredToken);
+
+        assertThat(isValid).isFalse();
+    }
+
+    /**
+     * Verifies that validateJwtToken catches UnsupportedJwtException and returns false for unsigned tokens.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns false for unsigned token with no signature")
+    void validateJwtToken_withUnsignedToken_shouldReturnFalse() {
+        String unsignedToken = Jwts.builder()
+                .setSubject("unsigned@example.com")
+                .compact();
+
+        boolean isValid = jwtUtils.validateJwtToken(unsignedToken);
+
+        assertThat(isValid).isFalse();
+    }
+
+    /**
+     * Verifies that validateJwtToken catches IllegalArgumentException and returns false for null, empty, or whitespace tokens.
+     */
+    @Test
+    @DisplayName("validateJwtToken returns false for null, empty, or whitespace token")
+    void validateJwtToken_withNullOrEmptyOrBlankToken_shouldReturnFalse() {
+        assertThat(jwtUtils.validateJwtToken(null)).isFalse();
+        assertThat(jwtUtils.validateJwtToken("")).isFalse();
+        assertThat(jwtUtils.validateJwtToken("   ")).isFalse();
+    }
+}
