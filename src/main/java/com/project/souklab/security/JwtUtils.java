@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Date;
 
 @Component
@@ -19,6 +21,7 @@ import java.util.Date;
 public class JwtUtils {
 
     private final AppProperties appProperties;
+    private final Clock clock;
 
     private Key getSigningKey() {
         byte[] keyBytes = appProperties.getJwt().getSecret().getBytes();
@@ -48,8 +51,8 @@ public class JwtUtils {
     public String generateTokenFromUsername(String username, long expirationMs) {
         return Jwts.builder()
                 .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + expirationMs))
+                .setIssuedAt(Date.from(Instant.now(clock)))
+                .setExpiration(Date.from(Instant.now(clock).plusMillis(expirationMs)))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

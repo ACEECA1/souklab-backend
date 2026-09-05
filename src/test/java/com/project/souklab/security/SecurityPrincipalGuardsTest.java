@@ -1,6 +1,7 @@
 package com.project.souklab.security;
 
 import com.project.souklab.config.AppProperties;
+import java.time.Clock;
 import com.project.souklab.service.auth.AuthService;
 import com.project.souklab.util.ServletResponseUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +36,7 @@ class SecurityPrincipalGuardsTest {
         appProperties.getJwt().setAccessTokenExpirationMs(3600000L);
         appProperties.getJwt().setRefreshTokenExpirationMs(86400000L);
 
-        jwtUtils = new JwtUtils(appProperties);
+        jwtUtils = new JwtUtils(appProperties, Clock.systemUTC());
 
         AuthService authService = Mockito.mock(AuthService.class);
         ServletResponseUtil servletResponseUtil = Mockito.mock(ServletResponseUtil.class);

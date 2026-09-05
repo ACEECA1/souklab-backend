@@ -14,6 +14,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.security.Key;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,7 +26,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit tests verifying JWT generation, claim parsing, signature validation,
- * and error branch handling in JwtUtils.
+ * deterministic timestamp assignment, and error branch handling in JwtUtils.
  */
 @ExtendWith(MockitoExtension.class)
 class JwtUtilsTest {
@@ -31,18 +34,23 @@ class JwtUtilsTest {
     private static final String TEST_SECRET = "testSecretKeyWithMinimumLengthOfThirtyTwoBytes256BitsRequired!";
     private static final long ACCESS_TOKEN_EXPIRATION_MS = 3600000L;
     private static final long REFRESH_TOKEN_EXPIRATION_MS = 86400000L;
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-09-05T10:15:30.00Z");
+    private static final ZoneId ZONE_ID = ZoneId.of("UTC");
 
     private JwtUtils jwtUtils;
     private AppProperties appProperties;
+    private Clock fixedClock;
 
     @BeforeEach
     void setUp() {
+        fixedClock = Clock.fixed(FIXED_INSTANT, ZONE_ID);
+
         appProperties = new AppProperties();
         appProperties.getJwt().setSecret(TEST_SECRET);
         appProperties.getJwt().setAccessTokenExpirationMs(ACCESS_TOKEN_EXPIRATION_MS);
         appProperties.getJwt().setRefreshTokenExpirationMs(REFRESH_TOKEN_EXPIRATION_MS);
 
-        jwtUtils = new JwtUtils(appProperties);
+        jwtUtils = new JwtUtils(appProperties, fixedClock);
     }
 
     /**
@@ -66,8 +74,8 @@ class JwtUtilsTest {
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
         Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo("artisan@example.com");
-        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
-        assertThat(durationMs).isEqualTo(ACCESS_TOKEN_EXPIRATION_MS);
+        assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
+        assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(ACCESS_TOKEN_EXPIRATION_MS)));
     }
 
     /**
@@ -101,8 +109,8 @@ class JwtUtilsTest {
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
         Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo(username);
-        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
-        assertThat(durationMs).isEqualTo(ACCESS_TOKEN_EXPIRATION_MS);
+        assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
+        assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(ACCESS_TOKEN_EXPIRATION_MS)));
     }
 
     /**
@@ -126,8 +134,8 @@ class JwtUtilsTest {
         Key key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes());
         Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
         assertThat(claims.getSubject()).isEqualTo("refresh@example.com");
-        long durationMs = claims.getExpiration().getTime() - claims.getIssuedAt().getTime();
-        assertThat(durationMs).isEqualTo(REFRESH_TOKEN_EXPIRATION_MS);
+        assertThat(claims.getIssuedAt()).isEqualTo(Date.from(FIXED_INSTANT));
+        assertThat(claims.getExpiration()).isEqualTo(Date.from(FIXED_INSTANT.plusMillis(REFRESH_TOKEN_EXPIRATION_MS)));
     }
 
     /**
