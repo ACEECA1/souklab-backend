@@ -190,9 +190,40 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test(\"Me endpoint returns correct client email\", function () {",
+                  "pm.test(\"Me endpoint returns valid ApiResponse envelope\", function () {",
                   "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.data).to.be.an(\"object\");",
+                  "});",
+                  "pm.test(\"Client DTO contains required client profile fields\", function () {",
                   "    pm.expect(json.data.email).to.eql(pm.environment.get(\"clientEmail\"));",
+                  "    pm.expect(json.data).to.have.property(\"id\");",
+                  "    pm.expect(json.data).to.have.property(\"firstName\");",
+                  "    pm.expect(json.data).to.have.property(\"lastName\");",
+                  "    pm.expect(json.data).to.have.property(\"clientType\");",
+                  "    pm.expect(json.data).to.have.property(\"companyName\");",
+                  "    pm.expect(json.data).to.have.property(\"bio\");",
+                  "    pm.expect(json.data).to.have.property(\"address\");",
+                  "    pm.expect(json.data).to.have.property(\"regionId\");",
+                  "    pm.expect(json.data).to.have.property(\"city\");",
+                  "    pm.expect(json.data.roles).to.include(\"ROLE_CLIENT\");",
+                  "});",
+                  "pm.test(\"Artisan-only fields are absent from ClientProfileResponseDTO\", function () {",
+                  "    pm.expect(json.data.teacher).to.be.undefined;",
+                  "    pm.expect(json.data.subCategoryId).to.be.undefined;",
+                  "    pm.expect(json.data.rating).to.be.undefined;",
+                  "    pm.expect(json.data.reviewsCount).to.be.undefined;",
+                  "    pm.expect(json.data.website).to.be.undefined;",
+                  "});",
+                  "pm.test(\"Sensitive fields are strictly masked and never exposed\", function () {",
+                  "    pm.expect(json.data.password).to.be.undefined;",
+                  "    pm.expect(json.data.passwordHash).to.be.undefined;",
+                  "    pm.expect(json.data.lockedUntil).to.be.undefined;",
+                  "    pm.expect(json.data.failedLoginAttempts).to.be.undefined;",
+                  "    pm.expect(json.data.bannedUntil).to.be.undefined;",
+                  "    pm.expect(json.data.banReason).to.be.undefined;",
+                  "    pm.expect(json.data.verificationCode).to.be.undefined;",
+                  "    pm.expect(json.data.resetToken).to.be.undefined;",
                   "});"
                 ]
               }
@@ -226,8 +257,26 @@
           "response": []
         },
         {
-          "name": "Update Profile / Patch Me (Client)",
+          "name": "PATCH Me \u2014 Omitted Fields Untouched (Client)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest({",
+                  "    url: pm.environment.get(\"baseUrl\") + \"/auth/me\",",
+                  "    method: \"GET\",",
+                  "    header: { \"Authorization\": \"Bearer \" + pm.environment.get(\"clientAccessToken\") }",
+                  "}, function (err, res) {",
+                  "    if (!err && res.code === 200) {",
+                  "        const body = res.json();",
+                  "        pm.variables.set(\"clientPreData\", JSON.stringify(body.data));",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -237,9 +286,15 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test(\"Profile updated successfully\", function () {",
-                  "    pm.expect(json.success).to.be.true;",
-                  "    pm.expect(json.data.city).to.eql(\"Oran\");",
+                  "pm.test(\"Updated field changed to new value\", function () {",
+                  "    pm.expect(json.data.city).to.eql(\"Batna\");",
+                  "});",
+                  "pm.test(\"Omitted fields remain strictly untouched\", function () {",
+                  "    const pre = JSON.parse(pm.variables.get(\"clientPreData\") || \"{}\");",
+                  "    pm.expect(json.data.bio).to.eql(pre.bio);",
+                  "    pm.expect(json.data.address).to.eql(pre.address);",
+                  "    pm.expect(json.data.companyName).to.eql(pre.companyName);",
+                  "    pm.expect(json.data.clientType).to.eql(pre.clientType);",
                   "});"
                 ]
               }
@@ -259,15 +314,6 @@
                 "type": "text"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"city\": \"Oran\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
             "url": {
               "raw": "{{baseUrl}}/auth/me",
               "host": [
@@ -277,6 +323,134 @@
                 "auth",
                 "me"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Batna\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Me \u2014 Explicit Null Clears Field (Client)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Explicitly nulled fields are cleared to null in response\", function () {",
+                  "    pm.expect(json.data.bio).to.be.null;",
+                  "    pm.expect(json.data.address).to.be.null;",
+                  "    pm.expect(json.data.companyName).to.be.null;",
+                  "});",
+                  "pm.test(\"Non-null fields are preserved\", function () {",
+                  "    pm.expect(json.data.city).to.eql(\"Batna\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": null,\n  \"address\": null,\n  \"companyName\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Me \u2014 Unpatchable Fields Silently Ignored (Client)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Security and unpatchable fields were silently ignored\", function () {",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"clientEmail\"));",
+                  "    pm.expect(json.data.roles).to.not.include(\"ROLE_ADMIN\");",
+                  "    pm.expect(json.data.roles).to.include(\"ROLE_CLIENT\");",
+                  "    pm.expect(json.data.accountStatus).to.eql(\"ACTIVE\");",
+                  "    pm.expect(json.data.teacher).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hacked.admin@souklab.dz\",\n  \"roles\": [\n    \"ROLE_ADMIN\"\n  ],\n  \"teacher\": true,\n  \"accountStatus\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -322,116 +496,6 @@
               "path": [
                 "auth",
                 "refresh"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{clientRefreshToken}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Change Password (Client)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "const json = pm.response.json();",
-                  "pm.test(\"Password changed successfully\", function () {",
-                  "    pm.expect(json.success).to.be.true;",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{clientAccessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/change-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "change-password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword456!\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Logout (Client)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "const json = pm.response.json();",
-                  "pm.test(\"Logout succeeded\", function () {",
-                  "    pm.expect(json.success).to.be.true;",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{clientAccessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "logout"
               ]
             },
             "body": {
@@ -679,6 +743,251 @@
           "response": []
         },
         {
+          "name": "Complete Profile \u2014 Empty Body Allowed (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for empty payload\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Response contains valid profile\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.be.an(\"object\");",
+                  "    pm.expect(json.data.roles).to.include(\"ROLE_ARTISAN\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{artisanAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/complete-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "complete-profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Profile \u2014 Repeated Invocation (Additive & Idempotent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK on repeated complete-profile invocation\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"City updated while preserving earlier profile attributes\", function () {",
+                  "    pm.expect(json.data.city).to.eql(\"Ghardaia\");",
+                  "    pm.expect(json.data.bio).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{artisanAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/complete-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "complete-profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Ghardaia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Profile \u2014 Malformed Payload (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request for malformed payload types\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error envelope returned\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{artisanAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/complete-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "complete-profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"city\": 12345, \"materialIds\": \"not-an-array\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User / Me (Artisan)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Me endpoint returns valid ApiResponse envelope\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.data).to.be.an(\"object\");",
+                  "});",
+                  "pm.test(\"Artisan DTO contains required artisan profile fields\", function () {",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"artisanEmail\"));",
+                  "    pm.expect(json.data).to.have.property(\"id\");",
+                  "    pm.expect(json.data).to.have.property(\"firstName\");",
+                  "    pm.expect(json.data).to.have.property(\"lastName\");",
+                  "    pm.expect(json.data).to.have.property(\"bio\");",
+                  "    pm.expect(json.data).to.have.property(\"regionId\");",
+                  "    pm.expect(json.data).to.have.property(\"city\");",
+                  "    pm.expect(json.data).to.have.property(\"address\");",
+                  "    pm.expect(json.data).to.have.property(\"website\");",
+                  "    pm.expect(json.data).to.have.property(\"subCategoryId\");",
+                  "    pm.expect(typeof json.data.teacher).to.eql(\"boolean\");",
+                  "    pm.expect(typeof json.data.verified).to.eql(\"boolean\");",
+                  "    pm.expect(typeof json.data.premium).to.eql(\"boolean\");",
+                  "    pm.expect(typeof json.data.rating).to.eql(\"number\");",
+                  "    pm.expect(typeof json.data.reviewsCount).to.eql(\"number\");",
+                  "    pm.expect(json.data.roles).to.include(\"ROLE_ARTISAN\");",
+                  "});",
+                  "pm.test(\"Client-only fields are absent from ArtisanResponseDTO\", function () {",
+                  "    pm.expect(json.data.clientType).to.be.undefined;",
+                  "    pm.expect(json.data.companyName).to.be.undefined;",
+                  "});",
+                  "pm.test(\"Sensitive fields are strictly masked and never exposed\", function () {",
+                  "    pm.expect(json.data.password).to.be.undefined;",
+                  "    pm.expect(json.data.passwordHash).to.be.undefined;",
+                  "    pm.expect(json.data.lockedUntil).to.be.undefined;",
+                  "    pm.expect(json.data.failedLoginAttempts).to.be.undefined;",
+                  "    pm.expect(json.data.bannedUntil).to.be.undefined;",
+                  "    pm.expect(json.data.banReason).to.be.undefined;",
+                  "    pm.expect(json.data.verificationCode).to.be.undefined;",
+                  "    pm.expect(json.data.resetToken).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{artisanAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "body": {}
+          },
+          "response": []
+        },
+        {
           "name": "Update Profile / Patch Me (Artisan)",
           "event": [
             {
@@ -917,13 +1226,19 @@
                   "});",
                   "const json = pm.response.json();",
                   "pm.test(\"Non-premium client receives masked contact info\", function () {",
-                  "    pm.expect(json.success).to.be.true;",
                   "    pm.expect(json.data.contactInfoLocked).to.be.true;",
-                  "    pm.expect(json.data.name).to.include(\"Artisan #\");",
-                  "    pm.expect(json.data.email).to.be.null;",
+                  "    pm.expect(json.data.name).to.match(/^Artisan #[A-Z0-9]+$/);",
                   "    pm.expect(json.data.phone).to.be.null;",
-                  "    pm.expect(json.data.address).to.be.null;",
+                  "    pm.expect(json.data.email).to.be.null;",
                   "    pm.expect(json.data.website).to.be.null;",
+                  "    pm.expect(json.data.address).to.be.null;",
+                  "});",
+                  "pm.test(\"Public artisan metadata is visible\", function () {",
+                  "    pm.expect(json.data.id).to.eql(pm.environment.get(\"targetArtisanId\"));",
+                  "    pm.expect(json.data.bio).to.not.be.undefined;",
+                  "    pm.expect(json.data.city).to.not.be.undefined;",
+                  "    pm.expect(typeof json.data.rating).to.eql(\"number\");",
+                  "    pm.expect(typeof json.data.reviewsCount).to.eql(\"number\");",
                   "});"
                 ]
               }
@@ -969,10 +1284,9 @@
                   "});",
                   "const json = pm.response.json();",
                   "pm.test(\"Self viewer receives unmasked contact info\", function () {",
-                  "    pm.expect(json.success).to.be.true;",
                   "    pm.expect(json.data.contactInfoLocked).to.be.false;",
-                  "    pm.expect(json.data.email).to.not.be.null;",
-                  "    pm.expect(json.data.name).to.not.include(\"Artisan #\");",
+                  "    pm.expect(json.data.name).to.not.match(/^Artisan #[A-Z0-9]+$/);",
+                  "    pm.expect(json.data.email).to.eql(pm.environment.get(\"artisanEmail\"));",
                   "});",
                   "pm.test(\"Profile ID matches target artisan environment variable\", function () {",
                   "    pm.expect(json.data.id).to.eql(pm.environment.get(\"targetArtisanId\"));",
@@ -1004,6 +1318,1368 @@
                 "artisan",
                 "{{targetArtisanId}}"
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Artisan Profile \u2014 Non-Existent ID (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error envelope indicates resource not found\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(404);",
+                  "    pm.expect(json.errorCode).to.eql(\"RESOURCE_NOT_FOUND\");",
+                  "    pm.expect(json.message).to.include(\"Artisan not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/artisan/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "artisan",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "body": {}
+          },
+          "response": []
+        },
+        {
+          "name": "Get Artisan Profile \u2014 Non-Premium Client View (Deduplicated Reload)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK on deduplicated view reload\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Masked profile remains consistent across rapid reloads\", function () {",
+                  "    pm.expect(json.data.contactInfoLocked).to.be.true;",
+                  "    pm.expect(json.data.id).to.eql(pm.environment.get(\"targetArtisanId\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/artisan/{{targetArtisanId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "artisan",
+                "{{targetArtisanId}}"
+              ]
+            },
+            "body": {}
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth \u2014 Security & Lifecycle",
+      "item": [
+        {
+          "name": "Lockout Setup \u2014 Register Throwaway User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"lockoutEmail\", \"lockout.\" + ts + \"@souklab.dz\");",
+                  "pm.environment.set(\"lockoutPassword\", \"LockoutPass123!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for lockout test user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{lockoutPassword}}\",\n  \"firstName\": \"Lockout\",\n  \"lastName\": \"Tester\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login \u2014 Invalid Password (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error response envelope is valid\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "});",
+                  "pm.test(\"No tokens are exposed in error response\", function () {",
+                  "    pm.expect(json.data).to.be.null;",
+                  "    pm.expect(json.accessToken).to.be.undefined;",
+                  "    pm.expect(json.refreshToken).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"CompletelyWrongPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lockout \u2014 Failed Attempt 2 (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized (Attempt 2)\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"WrongPassword!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lockout \u2014 Failed Attempt 3 (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized (Attempt 3)\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"WrongPassword!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lockout \u2014 Failed Attempt 4 (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized (Attempt 4)\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"WrongPassword!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lockout \u2014 Failed Attempt 5 Triggers Account Lockout (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized on 5th failure\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"5th failure rejects with invalid credentials\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"WrongPassword!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lockout \u2014 6th Attempt with CORRECT Password Fails While Locked (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden when account is locked\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Lockout error indicates account is temporarily locked\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(403);",
+                  "    pm.expect(json.errorCode).to.eql(\"FORBIDDEN\");",
+                  "    pm.expect(json.message).to.include(\"Account is temporarily locked\");",
+                  "});",
+                  "pm.test(\"Tokens are not issued while account is locked\", function () {",
+                  "    pm.expect(json.data).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lockoutEmail}}\",\n  \"password\": \"{{lockoutPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Setup \u2014 Register Rotation Test User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"rotationEmail\", \"rotation.\" + ts + \"@souklab.dz\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for rotation test user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rotationEmail}}\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"Rotation\",\n  \"lastName\": \"Tester\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Setup \u2014 Initial Login for Tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set(\"initialRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rotationEmail}}\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh \u2014 Rotate Refresh Token (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for valid refresh\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"New token pair issued\", function () {",
+                  "    pm.expect(json.data.accessToken).to.not.be.empty;",
+                  "    pm.expect(json.data.refreshToken).to.not.be.empty;",
+                  "    pm.expect(json.data.refreshToken).to.not.eql(pm.environment.get(\"initialRefreshToken\"));",
+                  "});",
+                  "pm.environment.set(\"newRotatedRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{initialRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh \u2014 Attempt Reuse of Rotated Refresh Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for reused refresh token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Reuse attempt rejected with invalid refresh token message\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid refresh token.\");",
+                  "});",
+                  "pm.test(\"No tokens issued on reuse attempt\", function () {",
+                  "    pm.expect(json.data).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{initialRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh \u2014 Tampered / Garbage Refresh Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for garbage refresh token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Garbage token rejected\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid refresh token.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"tampered.garbage.token.99999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout Setup \u2014 Register Throwaway User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"logoutEmail\", \"logout.\" + ts + \"@souklab.dz\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for logout test user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"Logout\",\n  \"lastName\": \"Tester\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout Setup \u2014 Login Throwaway User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set(\"logoutAccessToken\", json.data.accessToken);",
+                  "pm.environment.set(\"logoutRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{logoutEmail}}\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout \u2014 Revoke Session Tokens (POST /logout)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for logout\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Logout succeeded envelope\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.message).to.eql(\"Logout successful.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{logoutAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{logoutRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout \u2014 Attempt Refresh with Revoked Token Proves Invalidation (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for revoked session token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Refresh fails proving server-side revocation on logout\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid refresh token.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{logoutRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password Setup \u2014 Register Dedicated Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"pwdChgEmail\", \"pwdchg.\" + ts + \"@souklab.dz\");",
+                  "pm.environment.set(\"pwdChgInitialPassword\", \"Password123!\");",
+                  "pm.environment.set(\"pwdChgNewPassword\", \"BrandNewSecretPassword456!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for password change test user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{pwdChgEmail}}\",\n  \"password\": \"{{pwdChgInitialPassword}}\",\n  \"firstName\": \"Pwd\",\n  \"lastName\": \"Changer\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password Setup \u2014 Login Dedicated Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set(\"pwdChgAccessToken\", json.data.accessToken);",
+                  "pm.environment.set(\"pwdChgRefreshToken\", json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{pwdChgEmail}}\",\n  \"password\": \"{{pwdChgInitialPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 Wrong Current Password (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for incorrect current password\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error indicates current password is incorrect\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.errorCode).to.eql(\"UNAUTHORIZED\");",
+                  "    pm.expect(json.message).to.eql(\"Current password is incorrect.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pwdChgAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"IncorrectPassword123!\",\n  \"newPassword\": \"ValidNewPassword456!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 New Password Same as Old Password (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 422 Unprocessable Entity when new password matches old\", function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Validation error indicates new password must be different\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(422);",
+                  "    pm.expect(json.message).to.eql(\"Validation failed\");",
+                  "    pm.expect(json.errors).to.be.an(\"object\");",
+                  "    pm.expect(json.errors.newPassword).to.eql(\"New password must be different from your current password.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pwdChgAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"{{pwdChgInitialPassword}}\",\n  \"newPassword\": \"{{pwdChgInitialPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 Successful Password Change",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for successful password change\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Success envelope returned\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.message).to.eql(\"Password changed successfully.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pwdChgAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"{{pwdChgInitialPassword}}\",\n  \"newPassword\": \"{{pwdChgNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 Prove Old Password No Longer Logs In (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized with old password\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Old password rejected\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{pwdChgEmail}}\",\n  \"password\": \"{{pwdChgInitialPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 Prove New Password Successfully Logs In (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK with new password\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"New password successfully authenticated\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.accessToken).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{pwdChgEmail}}\",\n  \"password\": \"{{pwdChgNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password \u2014 Prove Pre-Change Refresh Token Invalidated (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized for pre-change refresh token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Pre-change refresh token was revoked upon password change\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "    pm.expect(json.message).to.eql(\"Invalid refresh token.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{pwdChgRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
