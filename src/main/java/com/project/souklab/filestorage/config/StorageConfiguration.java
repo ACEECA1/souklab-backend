@@ -4,6 +4,9 @@ import com.project.souklab.filestorage.StorageService;
 import com.project.souklab.filestorage.image.ImageProcessingService;
 import com.project.souklab.filestorage.image.ThumbnailatorImageProcessingService;
 import com.project.souklab.filestorage.s3.S3StorageService;
+import com.project.souklab.filestorage.scan.ClamdInstreamScanner;
+import com.project.souklab.filestorage.scan.VirusScanService;
+import com.project.souklab.filestorage.scan.VirusScanner;
 import com.project.souklab.filestorage.stub.InMemoryStorageService;
 import com.project.souklab.filestorage.validation.FileValidator;
 import org.apache.tika.Tika;
@@ -25,8 +28,8 @@ import java.time.Clock;
 
 /**
  * Spring auto-configuration for the file storage module.
- * Provides beans for Tika MIME sniffing, file validation, and conditionally
- * registers either in-memory or S3-compatible backend storage services.
+ * Provides beans for Tika MIME sniffing, file validation, antivirus scanning,
+ * image processing, and conditionally registers either in-memory or S3-compatible backend storage services.
  */
 @Configuration
 @EnableConfigurationProperties(StorageProperties.class)
@@ -148,5 +151,42 @@ public class StorageConfiguration {
     @ConditionalOnMissingBean(ImageProcessingService.class)
     public ImageProcessingService imageProcessingService() {
         return new ThumbnailatorImageProcessingService();
+    }
+
+    /**
+     * Registers the ClamAV daemon INSTREAM scanner bean.
+     * Validates that host and positive port are configured if virus scanning is enabled,
+     * failing fast at startup with an {@link IllegalStateException} if missing or invalid.
+     *
+     * @param properties file storage configuration properties
+     * @return a configured ClamdInstreamScanner bean
+     * @throws IllegalStateException if virus scanning is enabled but host or port is invalid
+     */
+    @Bean
+    @ConditionalOnMissingBean(VirusScanner.class)
+    public VirusScanner virusScanner(StorageProperties properties) {
+        StorageProperties.VirusScanProperties scanProps = properties.getVirusScan();
+        if (scanProps != null && scanProps.isEnabled()) {
+            if (scanProps.getHost() == null || scanProps.getHost().isBlank()) {
+                throw new IllegalStateException("storage.virus-scan.host is required when storage.virus-scan.enabled=true");
+            }
+            if (scanProps.getPort() <= 0) {
+                throw new IllegalStateException("storage.virus-scan.port must be positive when storage.virus-scan.enabled=true");
+            }
+        }
+        return new ClamdInstreamScanner(scanProps != null ? scanProps : new StorageProperties.VirusScanProperties());
+    }
+
+    /**
+     * Registers the virus scanning coordinator service bean.
+     *
+     * @param properties file storage configuration properties
+     * @param virusScanner the configured VirusScanner implementation
+     * @return a configured VirusScanService bean
+     */
+    @Bean
+    @ConditionalOnMissingBean(VirusScanService.class)
+    public VirusScanService virusScanService(StorageProperties properties, VirusScanner virusScanner) {
+        return new VirusScanService(properties, virusScanner);
     }
 }

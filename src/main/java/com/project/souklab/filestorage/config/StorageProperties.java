@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -91,5 +92,49 @@ public class StorageProperties {
          * Automatically create bucket on startup if it doesn't exist.
          */
         private Boolean autoCreateBucket;
+    }
+
+    /**
+     * Antivirus scanning configuration for ClamAV daemon integration.
+     */
+    private VirusScanProperties virusScan = new VirusScanProperties();
+
+    /**
+     * Nested antivirus scanning configuration properties.
+     */
+    @Getter
+    @Setter
+    public static class VirusScanProperties {
+        /**
+         * Whether antivirus scanning via ClamAV is enabled.
+         */
+        private boolean enabled;
+
+        /**
+         * ClamAV daemon hostname or IP address.
+         */
+        private String host;
+
+        /**
+         * ClamAV daemon TCP port (standard: 3310).
+         */
+        private int port;
+
+        /**
+         * Socket connection timeout.
+         */
+        private Duration connectionTimeout;
+
+        /**
+         * Socket read timeout for scanning streaming data.
+         */
+        private Duration readTimeout;
+
+        /**
+         * Failure policy when ClamAV daemon is unreachable or errors:
+         * true = fail-open (log warning, allow upload to proceed),
+         * false = fail-closed (reject upload with VirusScanException).
+         */
+        private boolean failOpen;
     }
 }

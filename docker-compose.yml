@@ -27,6 +27,21 @@ services:
       timeout: 5s
       retries: 5
 
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: souklab-clamav
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    # Note: On initial startup with an empty volume, freshclam downloads virus definitions (~200-300MB),
+    # which takes approximately 1-3 minutes before clamd opens port 3310. Subsequent startups with
+    # the populated volume take ~10-15 seconds.
+
 volumes:
   minio_data:
     name: souklab_minio_data
+  clamav_data:
+    name: souklab_clamav_data
+

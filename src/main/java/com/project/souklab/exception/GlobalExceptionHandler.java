@@ -1,6 +1,8 @@
 package com.project.souklab.exception;
 
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.filestorage.exception.VirusDetectedException;
+import com.project.souklab.filestorage.exception.VirusScanException;
 import com.project.souklab.util.SecurityUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -37,6 +39,26 @@ public class GlobalExceptionHandler {
         log.warn("AppException [{}]: {}", ex.getErrorCode(), ex.getMessage());
         return ResponseEntity.status(ex.getStatus())
                 .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    /**
+     * Handles malware detected during file upload antivirus scanning (422 Unprocessable Content).
+     */
+    @ExceptionHandler(VirusDetectedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVirusDetectedException(VirusDetectedException ex) {
+        log.warn("VirusDetectedException [VIRUS_DETECTED]: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(ApiResponse.error("VIRUS_DETECTED", ex.getMessage()));
+    }
+
+    /**
+     * Handles failures in the antivirus scanning infrastructure under fail-closed policy (503 Service Unavailable).
+     */
+    @ExceptionHandler(VirusScanException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVirusScanException(VirusScanException ex) {
+        log.error("VirusScanException [VIRUS_SCAN_UNAVAILABLE]: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error("VIRUS_SCAN_UNAVAILABLE", ex.getMessage()));
     }
 
     /**
