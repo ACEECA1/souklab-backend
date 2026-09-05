@@ -1,4 +1,4 @@
-package com.project.souklab.filestorage.security;
+package com.project.souklab.security;
 
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.filestorage.config.StorageProperties;

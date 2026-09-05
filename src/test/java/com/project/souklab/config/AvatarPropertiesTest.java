@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.source.ConfigurationPropertyS
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +22,10 @@ class AvatarPropertiesTest {
 
         assertThat(properties.getMaxPerUser()).isZero();
         assertThat(properties.getAllowedMimeTypes()).isNull();
+        assertThat(properties.getRateLimit()).isNotNull();
+        assertThat(properties.getRateLimit().isEnabled()).isFalse();
+        assertThat(properties.getRateLimit().getCapacity()).isZero();
+        assertThat(properties.getRateLimit().getRefillDuration()).isNull();
     }
 
     @Test
@@ -29,7 +34,10 @@ class AvatarPropertiesTest {
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources().addLast(new MapPropertySource("test", Map.of(
                 "avatar.max-per-user", "10",
-                "avatar.allowed-mime-types", "image/jpeg,image/png,image/webp"
+                "avatar.allowed-mime-types", "image/jpeg,image/png,image/webp",
+                "avatar.rate-limit.enabled", "true",
+                "avatar.rate-limit.capacity", "5",
+                "avatar.rate-limit.refill-duration", "1m"
         )));
 
         Binder binder = new Binder(ConfigurationPropertySources.from(environment.getPropertySources()));
@@ -37,6 +45,9 @@ class AvatarPropertiesTest {
 
         assertThat(properties.getMaxPerUser()).isEqualTo(10L);
         assertThat(properties.getAllowedMimeTypes()).containsExactly("image/jpeg", "image/png", "image/webp");
+        assertThat(properties.getRateLimit().isEnabled()).isTrue();
+        assertThat(properties.getRateLimit().getCapacity()).isEqualTo(5);
+        assertThat(properties.getRateLimit().getRefillDuration()).isEqualTo(Duration.ofMinutes(1));
     }
 
     @Test
@@ -45,7 +56,10 @@ class AvatarPropertiesTest {
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources().addLast(new MapPropertySource("test", Map.of(
                 "avatar.max-per-user", "5",
-                "avatar.allowed-mime-types", "image/png,image/webp"
+                "avatar.allowed-mime-types", "image/png,image/webp",
+                "avatar.rate-limit.enabled", "false",
+                "avatar.rate-limit.capacity", "2",
+                "avatar.rate-limit.refill-duration", "30s"
         )));
 
         Binder binder = new Binder(ConfigurationPropertySources.from(environment.getPropertySources()));
@@ -53,5 +67,8 @@ class AvatarPropertiesTest {
 
         assertThat(properties.getMaxPerUser()).isEqualTo(5L);
         assertThat(properties.getAllowedMimeTypes()).containsExactly("image/png", "image/webp");
+        assertThat(properties.getRateLimit().isEnabled()).isFalse();
+        assertThat(properties.getRateLimit().getCapacity()).isEqualTo(2);
+        assertThat(properties.getRateLimit().getRefillDuration()).isEqualTo(Duration.ofSeconds(30));
     }
 }

@@ -2,8 +2,9 @@ package com.project.souklab.config;
 
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.filestorage.config.StorageProperties;
-import com.project.souklab.filestorage.security.AvatarUploadSizeFilter;
 import com.project.souklab.filestorage.security.FileRateLimitFilter;
+import com.project.souklab.security.AvatarUploadRateLimitFilter;
+import com.project.souklab.security.AvatarUploadSizeFilter;
 import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
 import com.project.souklab.security.RateLimitFilter;
@@ -36,6 +37,7 @@ public class SecurityConfig {
 
     private final AppProperties appProperties;
     private final StorageProperties storageProperties;
+    private final AvatarProperties avatarProperties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final FileRateLimitFilter fileRateLimitFilter;
@@ -45,6 +47,11 @@ public class SecurityConfig {
     @Bean
     public AvatarUploadSizeFilter avatarUploadSizeFilter() {
         return new AvatarUploadSizeFilter(storageProperties, servletResponseUtil);
+    }
+
+    @Bean
+    public AvatarUploadRateLimitFilter avatarUploadRateLimitFilter() {
+        return new AvatarUploadRateLimitFilter(servletResponseUtil, avatarProperties);
     }
 
     @Bean
@@ -71,6 +78,13 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<AvatarUploadSizeFilter> avatarUploadSizeFilterRegistration(AvatarUploadSizeFilter filter) {
         FilterRegistrationBean<AvatarUploadSizeFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AvatarUploadRateLimitFilter> avatarUploadRateLimitFilterRegistration(AvatarUploadRateLimitFilter filter) {
+        FilterRegistrationBean<AvatarUploadRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
@@ -131,6 +145,7 @@ public class SecurityConfig {
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(fileRateLimitFilter, JwtAuthenticationFilter.class);
         http.addFilterAfter(avatarUploadSizeFilter(), JwtAuthenticationFilter.class);
+        http.addFilterAfter(avatarUploadRateLimitFilter(), AvatarUploadSizeFilter.class);
 
         return http.build();
     }

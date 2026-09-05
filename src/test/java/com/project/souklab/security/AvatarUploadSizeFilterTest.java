@@ -1,4 +1,4 @@
-package com.project.souklab.filestorage.security;
+package com.project.souklab.security;
 
 import tools.jackson.databind.json.JsonMapper;
 import com.project.souklab.filestorage.config.StorageProperties;
