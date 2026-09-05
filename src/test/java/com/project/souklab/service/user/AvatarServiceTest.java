@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,9 +37,14 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -215,6 +221,108 @@ class AvatarServiceTest {
         inOrder.verify(imageProcessingService).generateVariants(scannedFile);
         inOrder.verify(storageService, times(3)).store(any(), any(), any(), anyLong());
         inOrder.verify(transactionTemplate).execute(any());
+    }
+
+    /**
+     * Verifies that when a disk-buffered multipart file (backed by a real file stream on disk)
+     * is processed, the stream is not prematurely closed between validation and image processing,
+     * allowing image variant generation to read the full contents without an "IOException: Stream Closed".
+     */
+    @Test
+    @DisplayName("uploadAvatar does not close disk-buffered file stream prematurely before image processing")
+    void uploadAvatar_whenDiskBufferedMultipartFile_doesNotCloseStreamPrematurelyBeforeImageProcessing(@TempDir Path tempDir) throws Exception {
+        Path tempFile = tempDir.resolve("disk-avatar.jpg");
+        byte[] expectedBytes = new byte[]{0x11, 0x22, 0x33, 0x44, 0x55};
+        Files.write(tempFile, expectedBytes);
+
+        MultipartFile diskMultipartFile = new MultipartFile() {
+            @Override
+            public String getName() {
+                return "file";
+            }
+
+            @Override
+            public String getOriginalFilename() {
+                return "disk-avatar.jpg";
+            }
+
+            @Override
+            public String getContentType() {
+                return "image/jpeg";
+            }
+
+            @Override
+            public boolean isEmpty() {
+                return false;
+            }
+
+            @Override
+            public long getSize() {
+                return expectedBytes.length;
+            }
+
+            @Override
+            public byte[] getBytes() throws IOException {
+                return Files.readAllBytes(tempFile);
+            }
+
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return Files.newInputStream(tempFile);
+            }
+
+            @Override
+            public void transferTo(File dest) throws IOException, IllegalStateException {
+                Files.copy(tempFile, dest.toPath());
+            }
+        };
+
+        when(userAvatarRepository.countByUserId(testUser.getId())).thenReturn(0L);
+
+        // Simulate FileValidator passing through the actual stream into ValidatedFile
+        when(fileValidator.validateAndSanitize(any(InputStream.class), eq("disk-avatar.jpg"), eq("image/jpeg"), eq((long) expectedBytes.length), any()))
+                .thenAnswer(invocation -> new ValidatedFile(
+                        invocation.getArgument(0),
+                        "disk-avatar.jpg",
+                        "image/jpeg",
+                        expectedBytes.length
+                ));
+
+        // Simulate VirusScanService passing through the ValidatedFile
+        when(virusScanService.scan(any(ValidatedFile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Simulate ImageProcessingService consuming the stream.
+        // If the stream was closed prematurely by AvatarService (e.g. in a try-with-resources around fileValidator),
+        // readAllBytes() on the FileInputStream will throw IOException: Stream Closed.
+        when(imageProcessingService.generateVariants(any(ValidatedFile.class))).thenAnswer(invocation -> {
+            ValidatedFile vf = invocation.getArgument(0);
+            byte[] consumed = vf.content().readAllBytes();
+            assertThat(consumed).isEqualTo(expectedBytes);
+            return createMockVariants();
+        });
+
+        StorageResult origResult = new StorageResult("key-orig-disk.jpg", "disk-avatar.jpg", "image/jpeg", 2L, Instant.now(clock));
+        StorageResult medResult = new StorageResult("key-med-disk.jpg", "disk-avatar.jpg", "image/jpeg", 2L, Instant.now(clock));
+        StorageResult thumbResult = new StorageResult("key-thumb-disk.jpg", "disk-avatar.jpg", "image/jpeg", 2L, Instant.now(clock));
+        when(storageService.store(any(InputStream.class), eq("disk-avatar.jpg"), any(String.class), anyLong()))
+                .thenReturn(origResult, medResult, thumbResult);
+
+        when(userAvatarRepository.findByUserIdAndIsActiveTrue(testUser.getId())).thenReturn(Optional.empty());
+
+        when(userAvatarRepository.save(any(UserAvatar.class))).thenAnswer(invocation -> {
+            UserAvatar a = invocation.getArgument(0);
+            a.setId("disk-avatar-id");
+            return a;
+        });
+
+        mockTransactionTemplateSuccess();
+
+        AvatarResponseDTO response = avatarService.uploadAvatar(testUser, diskMultipartFile);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo("disk-avatar-id");
+        assertThat(response.getUrlThumbnail()).isEqualTo("/api/v1/files/key-thumb-disk.jpg");
+        verify(imageProcessingService).generateVariants(any(ValidatedFile.class));
     }
 
     /**

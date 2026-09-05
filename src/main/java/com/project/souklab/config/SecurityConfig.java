@@ -9,6 +9,7 @@ import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
 import com.project.souklab.security.RateLimitFilter;
 import com.project.souklab.util.ServletResponseUtil;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -108,6 +109,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",

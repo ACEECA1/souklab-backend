@@ -93,9 +93,9 @@ public class AvatarService {
         }
 
         ValidatedFile validatedFile;
-        try (InputStream stream = file.getInputStream()) {
+        try {
             validatedFile = fileValidator.validateAndSanitize(
-                    stream,
+                    file.getInputStream(),
                     file.getOriginalFilename(),
                     file.getContentType(),
                     file.getSize(),
