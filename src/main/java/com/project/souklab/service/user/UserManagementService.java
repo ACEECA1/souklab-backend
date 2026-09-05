@@ -90,7 +90,6 @@ public class UserManagementService {
         user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
 
-        // If the approved user is an Artisan, set verified = true
         artisanRepository.findById(userId).ifPresent(artisan -> {
             artisan.setVerified(true);
             artisanRepository.save(artisan);
@@ -115,10 +114,10 @@ public class UserManagementService {
 
         user.setStatus(AccountStatus.SUSPENDED);
         user.setBanReason(reason != null ? reason : "Account banned by administrator");
-        user.setBannedUntil(LocalDateTime.now(clock).plusYears(100)); // Indefinite ban
+        user.setBannedUntil(LocalDateTime.now(clock).plusYears(100));
+
         userRepository.save(user);
 
-        // Invalidate tokens for security
         refreshTokenService.deleteByUser(user);
 
         auditLogService.logAction(AuditLogAction.BAN_USER, "Banned user ID: " + userId + ". Reason: " + reason);
@@ -149,7 +148,6 @@ public class UserManagementService {
         user.setBannedUntil(LocalDateTime.now(clock).plusMinutes(minutes));
         userRepository.save(user);
 
-        // Invalidate tokens for security
         refreshTokenService.deleteByUser(user);
 
         auditLogService.logAction(AuditLogAction.TIMEOUT_USER, "Timed out user ID: " + userId + " for " + minutes + " minutes. Reason: " + reason);

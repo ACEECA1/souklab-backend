@@ -29,7 +29,6 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<ProfileResponse>> register(@Valid @RequestBody UserRegistrationDTO registrationDTO) {
         ProfileResponse response = authService.registerUser(registrationDTO);
-        // Determine status message based on the user's account status
         boolean isPending = response.getAccountStatus() == AccountStatus.PENDING;
         String message = isPending
                 ? "Registration successful. Your artisan account has been created and is pending administrator verification."
@@ -125,7 +124,8 @@ public class AuthController {
                 .path("/")
                 .httpOnly(true)
                 .sameSite("Lax")
-                .maxAge(300) // 5 minutes
+                .maxAge(300)
+
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }

@@ -279,7 +279,6 @@ class AvatarServiceTest {
 
         when(userAvatarRepository.countByUserId(testUser.getId())).thenReturn(0L);
 
-        // Simulate FileValidator passing through the actual stream into ValidatedFile
         when(fileValidator.validateAndSanitize(any(InputStream.class), eq("disk-avatar.jpg"), eq("image/jpeg"), eq((long) expectedBytes.length), any()))
                 .thenAnswer(invocation -> new ValidatedFile(
                         invocation.getArgument(0),
@@ -288,12 +287,8 @@ class AvatarServiceTest {
                         expectedBytes.length
                 ));
 
-        // Simulate VirusScanService passing through the ValidatedFile
         when(virusScanService.scan(any(ValidatedFile.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Simulate ImageProcessingService consuming the stream.
-        // If the stream was closed prematurely by AvatarService (e.g. in a try-with-resources around fileValidator),
-        // readAllBytes() on the FileInputStream will throw IOException: Stream Closed.
         when(imageProcessingService.generateVariants(any(ValidatedFile.class))).thenAnswer(invocation -> {
             ValidatedFile vf = invocation.getArgument(0);
             byte[] consumed = vf.content().readAllBytes();

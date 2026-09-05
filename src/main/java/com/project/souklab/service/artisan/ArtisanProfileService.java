@@ -45,7 +45,6 @@ public class ArtisanProfileService {
         boolean isAdmin = viewer.getRoles().stream()
                 .anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
 
-        // Viewer gating (bypassed for admins)
         if (!isAdmin) {
             if (viewer.getStatus() != AccountStatus.ACTIVE) {
                 throw new ForbiddenException("Your account is not active.");
@@ -60,7 +59,6 @@ public class ArtisanProfileService {
 
         boolean isSelf = viewer.getId().equals(artisan.getId());
 
-        // Deduplicated view tracking (skipped for self-view and admin-view)
         if (!isSelf && !isAdmin) {
             boolean alreadyViewed = artisanProfileViewRepository.existsByViewerIdAndArtisanId(viewer.getId(), artisan.getId());
             if (!alreadyViewed) {
@@ -75,7 +73,6 @@ public class ArtisanProfileService {
             }
         }
 
-        // Determine contact info masking
         boolean contactInfoLocked;
         if (isSelf || isAdmin) {
             contactInfoLocked = false;
@@ -89,7 +86,6 @@ public class ArtisanProfileService {
             contactInfoLocked = !isPremium;
         }
 
-        // Build response DTO
         User targetUser = artisan.getUser();
         String name;
         String phone;

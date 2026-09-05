@@ -83,7 +83,7 @@ Creates a base user account.
   "email": "artisan@example.com",
   "password": "StrongPassword123!",
   "name": "Ahmed Benali",
-  "role": "ROLE_ARTISAN" // or "ROLE_CLIENT"
+  "role": "ROLE_ARTISAN"
 }
 ```
 - **Response**: `201 Created` with User summary & confirmation email dispatch.

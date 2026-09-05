@@ -35,7 +35,6 @@ public class ClientProfileResponseDTO implements ProfileResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // --- Client profile fields ---
     private String clientType;
     private String companyName;
     private String bio;

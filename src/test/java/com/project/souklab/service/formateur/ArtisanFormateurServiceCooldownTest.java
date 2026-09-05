@@ -52,8 +52,9 @@ import static org.mockito.Mockito.when;
 class ArtisanFormateurServiceCooldownTest {
 
     private static final Instant REJECTION_INSTANT = Instant.parse("2026-09-01T12:00:00Z");
-    private static final Instant DURING_COOLDOWN_INSTANT = Instant.parse("2026-09-10T12:00:00Z"); // +9 days
-    private static final Instant AFTER_COOLDOWN_INSTANT = Instant.parse("2026-09-16T12:00:00Z");  // +15 days
+    private static final Instant DURING_COOLDOWN_INSTANT = Instant.parse("2026-09-10T12:00:00Z");
+
+    private static final Instant AFTER_COOLDOWN_INSTANT = Instant.parse("2026-09-16T12:00:00Z");
 
     @Mock
     private ArtisanFormateurRequestRepository formateurRequestRepository;
@@ -144,7 +145,7 @@ class ArtisanFormateurServiceCooldownTest {
         FormateurRejectDTO rejectDTO = new FormateurRejectDTO();
         rejectDTO.setAdminNote("Portfolio lacks required documentation.");
         rejectDTO.setCanReapply(true);
-        rejectDTO.setCooldownUntil(null); // Defaults to now(clock).plusDays(14)
+        rejectDTO.setCooldownUntil(null);
 
         FormateurRequestResponseDTO response = service.rejectRequest("req-123", rejectDTO);
 

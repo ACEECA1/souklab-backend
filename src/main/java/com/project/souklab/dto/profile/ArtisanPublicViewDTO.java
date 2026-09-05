@@ -25,7 +25,6 @@ public class ArtisanPublicViewDTO {
     private String avatarUrl;
     private LocalDateTime createdAt;
 
-    // Contact info gating
     private boolean contactInfoLocked;
     private String name;
     private String phone;

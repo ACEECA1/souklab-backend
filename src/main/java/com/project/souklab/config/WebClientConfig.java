@@ -6,6 +6,5 @@ package com.project.souklab.config;
 public class WebClientConfig {
 
     private WebClientConfig() {
-        // Placeholder configuration class pending Phase 9 Chargily Pay V2 integration
     }
 }

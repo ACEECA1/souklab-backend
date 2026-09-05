@@ -137,7 +137,6 @@ public class ArtisanFormateurService {
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
 
-        // Dual-dispatch to artisan: in-app + email
         User artisanUser = artisan.getUser();
         notificationService.createForUser(artisanUser, "Your request for Formateur status has been approved! Note: " + dto.getAdminNote(),
                 NotificationType.FORMATEUR_APPROVED, saved.getId());
@@ -177,7 +176,6 @@ public class ArtisanFormateurService {
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(request);
 
-        // Dual-dispatch to artisan: in-app + email
         User artisanUser = request.getArtisan().getUser();
         notificationService.createForUser(artisanUser, "Your Formateur request was rejected. Note: " + dto.getAdminNote(),
                 NotificationType.FORMATEUR_REJECTED, saved.getId());
@@ -218,7 +216,6 @@ public class ArtisanFormateurService {
 
         ArtisanFormateurRequest saved = formateurRequestRepository.saveAndFlush(auditRecord);
 
-        // Dual-dispatch to artisan: in-app + email
         User artisanUser = artisan.getUser();
         notificationService.createForUser(artisanUser, "You have been granted Formateur status by an administrator! Note: " + dto.getAdminNote(),
                 NotificationType.FORMATEUR_GRANTED, saved.getId());
@@ -246,7 +243,6 @@ public class ArtisanFormateurService {
         artisan.setTeacher(false);
         artisanRepository.save(artisan);
 
-        // Dual-dispatch to artisan: in-app + email
         User artisanUser = artisan.getUser();
         notificationService.createForUser(artisanUser, "Your Formateur status has been revoked. Reason: " + dto.getReason(),
                 NotificationType.FORMATEUR_REVOKED, artisanId);

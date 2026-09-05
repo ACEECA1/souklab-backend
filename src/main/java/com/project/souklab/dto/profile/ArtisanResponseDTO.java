@@ -22,7 +22,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class ArtisanResponseDTO implements ProfileResponse {
 
-    // --- User fields ---
     private String id;
     private String email;
     private String firstName;
@@ -38,7 +37,6 @@ public class ArtisanResponseDTO implements ProfileResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // --- Artisan fields ---
     private String bio;
     private String regionId;
     private String city;

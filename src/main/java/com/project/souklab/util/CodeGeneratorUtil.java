@@ -7,7 +7,6 @@ public final class CodeGeneratorUtil {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private CodeGeneratorUtil() {
-        // Utility class
     }
 
     /**

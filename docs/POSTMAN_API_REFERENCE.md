@@ -859,11 +859,16 @@ This document provides the exhaustive specification for all requests, headers, r
 
 ## 6. Notifications
 
-> In-app notification feeds, unread badge counts, read status updates, and deletions.
+> In-app notification feeds, unread badge counts, read status updates, and soft deletions.
+> **Note on Security & Ownership:** Ownership is query-scoped (`findByRecipientIdAndDeletedAtIsNull`). Attempting to read or delete a notification belonging to another user (or an already soft-deleted notification) returns `404 Not Found` with `RESOURCE_NOT_FOUND`, preventing resource enumeration.
 
 ### 6.1 Get Notifications (Paginated)
 - **Method**: `GET`
 - **Endpoint**: `{{baseUrl}}/notifications?page=0&size=20`
+- **Query Parameters**:
+  - `page` (optional, default: `0`): Page index (0-based)
+  - `size` (optional, default: `20`): Page size
+  - *Default sort: `createdAt DESC` (newest first). Soft-deleted rows (`deletedAt IS NOT NULL`) are strictly excluded.*
 
 #### Headers
 | Header | Value | Description |
@@ -885,16 +890,15 @@ This document provides the exhaustive specification for all requests, headers, r
     "content": [
       {
         "id": "18f3a09e-71c4-4b51-8e0f-48d8b67f1092",
-        "title": "Account Approved",
         "message": "Your artisan profile has been vetted and approved by our team.",
         "type": "ACCOUNT_VALIDATED",
         "read": false,
-        "referenceId": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
+        "targetId": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
         "createdAt": "2026-09-03T20:15:00"
       }
     ],
-    "page": 0,
-    "size": 20,
+    "pageNumber": 0,
+    "pageSize": 20,
     "totalElements": 1,
     "totalPages": 1,
     "last": true
@@ -907,6 +911,7 @@ This document provides the exhaustive specification for all requests, headers, r
 ### 6.2 Get Unread Count
 - **Method**: `GET`
 - **Endpoint**: `{{baseUrl}}/notifications/unread-count`
+- **Description**: Returns the count of unread, non-deleted notifications (`read = false AND deletedAt IS NULL`) as a raw integer in `data`.
 
 #### Headers
 | Header | Value | Description |
@@ -933,6 +938,7 @@ This document provides the exhaustive specification for all requests, headers, r
 ### 6.3 Mark One As Read
 - **Method**: `PUT`
 - **Endpoint**: `{{baseUrl}}/notifications/{{notificationId}}/read`
+- **Description**: Marks a specific notification as read (`read = true`). Returns the updated notification DTO in `data`.
 
 #### Headers
 | Header | Value | Description |
@@ -949,7 +955,26 @@ This document provides the exhaustive specification for all requests, headers, r
 {
   "success": true,
   "code": 200,
-  "message": "Action processed successfully.",
+  "message": "Success",
+  "data": {
+    "id": "18f3a09e-71c4-4b51-8e0f-48d8b67f1092",
+    "message": "Your artisan profile has been vetted and approved by our team.",
+    "type": "ACCOUNT_VALIDATED",
+    "read": true,
+    "targetId": "43fb36ad-7835-4fea-be7e-e3bc8f875e1e",
+    "createdAt": "2026-09-03T20:15:00"
+  }
+}
+```
+
+##### Not Found Response (`404 Not Found`)
+*Returned if the notification ID does not exist, belongs to another user, or is already soft-deleted.*
+```json
+{
+  "success": false,
+  "code": 404,
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "message": "Notification not found with id: 18f3a09e-71c4-4b51-8e0f-48d8b67f1092",
   "data": null
 }
 ```
@@ -959,6 +984,7 @@ This document provides the exhaustive specification for all requests, headers, r
 ### 6.4 Mark All As Read
 - **Method**: `PUT`
 - **Endpoint**: `{{baseUrl}}/notifications/read-all`
+- **Description**: Bulk updates all unread, non-deleted notifications for the authenticated user to `read = true`. Only touches rows where `read = false AND deletedAt IS NULL`.
 
 #### Headers
 | Header | Value | Description |
@@ -975,7 +1001,7 @@ This document provides the exhaustive specification for all requests, headers, r
 {
   "success": true,
   "code": 200,
-  "message": "Action processed successfully.",
+  "message": "All notifications marked as read",
   "data": null
 }
 ```
@@ -985,6 +1011,7 @@ This document provides the exhaustive specification for all requests, headers, r
 ### 6.5 Delete Notification
 - **Method**: `DELETE`
 - **Endpoint**: `{{baseUrl}}/notifications/{{notificationId}}`
+- **Description**: Soft-deletes a notification (`deletedAt = now()`). Immediately decrements unread count if the notification was unread, and excludes it from future queries.
 
 #### Headers
 | Header | Value | Description |
@@ -1001,7 +1028,19 @@ This document provides the exhaustive specification for all requests, headers, r
 {
   "success": true,
   "code": 200,
-  "message": "Action processed successfully.",
+  "message": "Notification deleted successfully",
+  "data": null
+}
+```
+
+##### Not Found Response (`404 Not Found`)
+*Returned if the notification ID does not exist, belongs to another user, or has already been soft-deleted.*
+```json
+{
+  "success": false,
+  "code": 404,
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "message": "Notification not found with id: 18f3a09e-71c4-4b51-8e0f-48d8b67f1092",
   "data": null
 }
 ```

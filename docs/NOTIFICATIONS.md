@@ -512,12 +512,9 @@ notificationService.notifyAdmins("New artisan registration pending approval: " +
 ### 9.2. Account Moderation Triggers
 - **Source**: `UserManagementService.java`
 ```java
-// 1. Account Approval:
 notificationService.createForUser(user, "Your account has been approved and is now active!", NotificationType.ACCOUNT_VALIDATED, user.getId());
 
-// 2. Account Ban (Permanent Suspension):
 notificationService.createForUser(user, "Your account has been permanently suspended. Reason: " + reason, NotificationType.ACCOUNT_SUSPENDED, user.getId());
 
-// 3. Account Timeout (Temporary Suspension):
 notificationService.createForUser(user, "Your account has been timed out for " + minutes + " minutes. Reason: " + reason, NotificationType.ACCOUNT_SUSPENDED, user.getId());
 ```

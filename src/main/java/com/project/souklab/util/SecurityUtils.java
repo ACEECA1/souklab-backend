@@ -7,7 +7,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class SecurityUtils {
 
     private SecurityUtils() {
-        // Utility class
     }
 
     public static String getCurrentUsername() {

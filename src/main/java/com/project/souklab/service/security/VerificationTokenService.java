@@ -42,7 +42,6 @@ public class VerificationTokenService {
     public String issueToken(User user, VerificationTokenType type) {
         LocalDateTime now = LocalDateTime.now(clock);
 
-        // Invalidate any existing active tokens for this user and type
         verificationTokenRepository.invalidateActiveTokens(user, type, now);
 
         String rawCode = CodeGeneratorUtil.generateNumericCode(6);
