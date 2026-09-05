@@ -1,6 +1,7 @@
 package com.project.souklab.config;
 
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.filestorage.security.FileRateLimitFilter;
 import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
 import com.project.souklab.security.RateLimitFilter;
@@ -34,6 +35,7 @@ public class SecurityConfig {
     private final AppProperties appProperties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
+    private final FileRateLimitFilter fileRateLimitFilter;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final ServletResponseUtil servletResponseUtil;
 
@@ -47,6 +49,13 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration() {
         FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(rateLimitFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<FileRateLimitFilter> fileRateLimitFilterRegistration() {
+        FilterRegistrationBean<FileRateLimitFilter> registration = new FilterRegistrationBean<>(fileRateLimitFilter);
         registration.setEnabled(false);
         return registration;
     }
@@ -105,6 +114,7 @@ public class SecurityConfig {
 
         http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(fileRateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

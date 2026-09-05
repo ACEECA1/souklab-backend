@@ -137,4 +137,31 @@ public class StorageProperties {
          */
         private boolean failOpen;
     }
+
+    /**
+     * Rate limiting configuration for file operations.
+     */
+    private RateLimitProperties rateLimit = new RateLimitProperties();
+
+    /**
+     * Nested rate limiting configuration properties for file operations.
+     */
+    @Getter
+    @Setter
+    public static class RateLimitProperties {
+        /**
+         * Whether rate limiting for file operations is enabled.
+         */
+        private boolean enabled = true;
+
+        /**
+         * Maximum number of requests allowed within the refill duration.
+         */
+        private int capacity = 120;
+
+        /**
+         * Duration over which the rate limit capacity refills (e.g. 1m).
+         */
+        private Duration refillDuration = Duration.ofMinutes(1);
+    }
 }

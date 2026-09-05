@@ -1,5 +1,6 @@
 package com.project.souklab.controller.support;
 
+import com.project.souklab.filestorage.security.FileRateLimitFilter;
 import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.RateLimitFilter;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -13,7 +14,7 @@ import java.lang.annotation.*;
 /**
  * Composite test annotation for controller slice testing.
  * Combines Boot 4 @WebMvcTest, excludes filter components (JwtAuthenticationFilter,
- * RateLimitFilter) that require unmocked services, and imports ControllerSliceSecurityConfig.
+ * RateLimitFilter, FileRateLimitFilter) that require unmocked services, and imports ControllerSliceSecurityConfig.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -22,7 +23,7 @@ import java.lang.annotation.*;
 @WebMvcTest(
         excludeFilters = @ComponentScan.Filter(
                 type = FilterType.ASSIGNABLE_TYPE,
-                classes = {JwtAuthenticationFilter.class, RateLimitFilter.class}
+                classes = {JwtAuthenticationFilter.class, RateLimitFilter.class, FileRateLimitFilter.class}
         )
 )
 @Import(ControllerSliceSecurityConfig.class)
