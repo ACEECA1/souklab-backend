@@ -7,7 +7,7 @@
   },
   "item": [
     {
-      "name": "Auth \u2014 Client",
+      "name": "Auth — Client",
       "description": "Full lifecycle for CLIENT account: Registration, Email Verification, Login, Me inspection, Token Refresh, Password Mutation, and Logout.",
       "item": [
         {
@@ -449,7 +449,7 @@
       ]
     },
     {
-      "name": "Auth \u2014 Artisan",
+      "name": "Auth — Artisan",
       "description": "Full onboarding lifecycle for ARTISAN account: Registration, Verification, Login, Complete Profile with craft specialties, and Token Refresh.",
       "item": [
         {
@@ -788,7 +788,7 @@
       ]
     },
     {
-      "name": "Auth \u2014 Admin",
+      "name": "Auth — Admin",
       "description": "Administrator authentication using config-driven seed credentials (seeded via DataSeeder and bound to APP_ADMIN_DEFAULT_EMAIL / APP_ADMIN_DEFAULT_PASSWORD), followed by initial artisan account validation.",
       "item": [
         {
@@ -901,11 +901,11 @@
       ]
     },
     {
-      "name": "Artisan \u2014 Profile View",
+      "name": "Artisan — Profile View",
       "description": "Public and authenticated profile inspection for Artisans, with premium-gated contact privacy.",
       "item": [
         {
-          "name": "Get Artisan Profile \u2014 Non-Premium Client View (Locked)",
+          "name": "Get Artisan Profile — Non-Premium Client View (Locked)",
           "event": [
             {
               "listen": "test",
@@ -957,7 +957,7 @@
           "response": []
         },
         {
-          "name": "Get Artisan Profile \u2014 Self / Unlocked View",
+          "name": "Get Artisan Profile — Self / Unlocked View",
           "event": [
             {
               "listen": "test",
@@ -1011,7 +1011,7 @@
       ]
     },
     {
-      "name": "Auth \u2014 Password Reset & Misc",
+      "name": "Auth — Password Reset & Misc",
       "description": "Public recovery endpoints: Forgot Password initiation, Password Reset with code, and Resend Verification OTP.",
       "item": [
         {
@@ -1406,7 +1406,7 @@
       ]
     },
     {
-      "name": "Formateur \u2014 Artisan Actions",
+      "name": "Formateur — Artisan Actions",
       "description": "Artisan self-submission of Formateur status request and duplicate prevention assertions.",
       "item": [
         {
@@ -1528,7 +1528,7 @@
       ]
     },
     {
-      "name": "Formateur \u2014 Admin Actions",
+      "name": "Formateur — Admin Actions",
       "description": "Admin review, approval, cooldown rejection & waiver, direct granting, revocation, and permanent blocking workflows using independent test artisans.",
       "item": [
         {
@@ -2841,7 +2841,7 @@
       ]
     },
     {
-      "name": "Admin \u2014 User Moderation",
+      "name": "Admin — User Moderation",
       "description": "Administrative operations for listing, filtering, bulk approving, timing out, and banning platform users.",
       "item": [
         {
@@ -3321,6 +3321,225 @@
             }
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Storage",
+      "description": "Endpoints for retrieving stored files and media with dedicated rate limiting and immutable caching.",
+      "item": [
+        {
+          "name": "Get File (Serve by Key)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{clientAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "sample-uuid.jpg",
+                  "description": "Unique storage identifier / key of the stored file (placeholder until upload orchestration in Phase D)"
+                }
+              ]
+            },
+            "description": "Streams a stored file by its unique storage key. Requires authentication (authenticated-only baseline). Sets Content-Type, Content-Length, inline Content-Disposition with RFC 5987 fallback, and private immutable Cache-Control headers."
+          },
+          "response": [
+            {
+              "name": "200 OK (File Stream)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{clientAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/files/:key",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "files",
+                    ":key"
+                  ],
+                  "variable": [
+                    {
+                      "key": "key",
+                      "value": "sample-uuid.jpg",
+                      "description": "Unique storage identifier / key of the stored file"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "binary",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "image/jpeg"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "1048576"
+                },
+                {
+                  "key": "Content-Disposition",
+                  "value": "inline; filename=\"avatar_original.jpg\"; filename*=UTF-8''avatar_original.jpg"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, max-age=31536000, immutable"
+                }
+              ],
+              "cookie": [],
+              "body": "<binary file stream content>"
+            },
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/files/:key",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "files",
+                    ":key"
+                  ],
+                  "variable": [
+                    {
+                      "key": "key",
+                      "value": "sample-uuid.jpg",
+                      "description": "Unique storage identifier / key of the stored file"
+                    }
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": 401,\n  \"message\": \"Full authentication is required to access this resource\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "404 Not Found (FILE_NOT_FOUND)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{clientAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/files/:key",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "files",
+                    ":key"
+                  ],
+                  "variable": [
+                    {
+                      "key": "key",
+                      "value": "nonexistent-key.jpg",
+                      "description": "Non-existent storage key"
+                    }
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": 404,\n  \"errorCode\": \"FILE_NOT_FOUND\",\n  \"message\": \"File not found for key: nonexistent-key.jpg\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "429 Too Many Requests",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{clientAccessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/files/:key",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "files",
+                    ":key"
+                  ],
+                  "variable": [
+                    {
+                      "key": "key",
+                      "value": "sample-uuid.jpg",
+                      "description": "Unique storage identifier / key of the stored file"
+                    }
+                  ]
+                }
+              },
+              "status": "Too Many Requests",
+              "code": 429,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": 429,\n  \"message\": \"Too many requests. Please try again later.\",\n  \"data\": null\n}"
+            }
+          ]
         }
       ]
     }

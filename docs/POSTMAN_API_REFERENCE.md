@@ -12,6 +12,7 @@ This document provides the exhaustive specification for all requests, headers, r
 7. [Formateur — Artisan Actions](#7-formateur--artisan-actions)
 8. [Formateur — Admin Actions](#8-formateur--admin-actions)
 9. [Admin — User Moderation](#9-admin--user-moderation)
+10. [File Storage](#10-file-storage)
 
 ---
 
@@ -2227,6 +2228,69 @@ This document provides the exhaustive specification for all requests, headers, r
   "success": true,
   "code": 200,
   "message": "User banned successfully",
+  "data": null
+}
+```
+
+---
+
+## 10. File Storage
+
+> File serving endpoints for retrieving stored assets by storage key with dedicated rate limiting and immutable caching headers.
+
+### 10.1 Get File (Serve by Key)
+- **Method**: `GET`
+- **Endpoint**: `{{baseUrl}}/files/:key`
+
+#### URL Parameters
+| Parameter | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `key` | String | Unique storage identifier / key of the stored file (placeholder until upload orchestration in Phase D) | `sample-uuid.jpg` |
+
+#### Headers
+| Header | Value | Description |
+| :--- | :--- | :--- |
+| `Authorization` | `Bearer {{clientAccessToken}}` | Bearer authentication token (authenticated-only baseline) |
+
+#### Response Examples
+##### Success Response (`200 OK`)
+- **Headers**:
+  - `Content-Type`: `image/jpeg`
+  - `Content-Length`: `1048576`
+  - `Content-Disposition`: `inline; filename="avatar_original.jpg"; filename*=UTF-8''avatar_original.jpg`
+  - `Cache-Control`: `private, max-age=31536000, immutable`
+- **Body**:
+```text
+<binary file stream content>
+```
+
+##### Error: Unauthenticated (`401 Unauthorized`)
+```json
+{
+  "success": false,
+  "code": 401,
+  "message": "Full authentication is required to access this resource",
+  "data": null
+}
+```
+
+##### Error: Not Found (`404 Not Found`)
+```json
+{
+  "success": false,
+  "code": 404,
+  "errorCode": "FILE_NOT_FOUND",
+  "message": "File not found for key: nonexistent-key.jpg",
+  "data": null
+}
+```
+
+##### Error: Rate Limited (`429 Too Many Requests`)
+```json
+{
+  "success": false,
+  "code": 429,
+  "message": "Too many requests. Please try again later.",
   "data": null
 }
 ```
