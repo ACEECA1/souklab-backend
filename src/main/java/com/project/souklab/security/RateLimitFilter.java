@@ -1,5 +1,6 @@
 package com.project.souklab.security;
 
+import com.project.souklab.config.AppProperties;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.util.ServletResponseUtil;
 import io.github.bucket4j.Bandwidth;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,12 +23,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ServletResponseUtil servletResponseUtil;
+    private final AppProperties appProperties;
     private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return !appProperties.getRateLimit().isEnabled();
+    }
+
     private Bucket createNewBucket() {
+        AppProperties.RateLimit config = appProperties.getRateLimit();
         Bandwidth limit = Bandwidth.builder()
-                .capacity(100)
-                .refillGreedy(100, Duration.ofMinutes(1))
+                .capacity(config.getCapacity())
+                .refillGreedy(config.getCapacity(), config.getRefillDuration())
                 .build();
         return Bucket.builder().addLimit(limit).build();
     }
@@ -40,7 +47,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
+
         String ip = request.getRemoteAddr();
         Bucket bucket = resolveBucket(ip);
 

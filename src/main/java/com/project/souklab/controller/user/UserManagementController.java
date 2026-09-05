@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -52,13 +53,13 @@ public class UserManagementController {
     }
 
     @PostMapping("/{id}/ban")
-    public ResponseEntity<ApiResponse<Void>> banUser(@PathVariable String id, @RequestBody BanRequestDTO request) {
+    public ResponseEntity<ApiResponse<Void>> banUser(@PathVariable String id, @Valid @RequestBody BanRequestDTO request) {
         userManagementService.banUser(id, request.getReason());
         return ResponseEntity.ok(ApiResponse.success(null, "User banned successfully"));
     }
 
     @PostMapping("/{id}/timeout")
-    public ResponseEntity<ApiResponse<Void>> timeoutUser(@PathVariable String id, @RequestBody TimeoutRequestDTO request) {
+    public ResponseEntity<ApiResponse<Void>> timeoutUser(@PathVariable String id, @Valid @RequestBody TimeoutRequestDTO request) {
         userManagementService.timeoutUser(id, request.getMinutes(), request.getReason());
         return ResponseEntity.ok(ApiResponse.success(null, "User timed out successfully"));
     }

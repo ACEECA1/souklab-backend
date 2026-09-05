@@ -514,27 +514,22 @@ class UserManagementControllerTest {
         }
 
         /**
-         * Verifies that a request with omitted/null reason forwards null to the service
-         * (since UserManagementController does not declare @Valid on BanRequestDTO).
+         * Verifies that a blank reason is rejected by Bean Validation (@NotBlank) with
+         * 422 Unprocessable Content, and the service is never called.
          */
         @Test
-        @DisplayName("ROLE_ADMIN with omitted reason forwards null reason to service")
-        void banUser_withNullReason_shouldPassNullAndReturn200Ok() throws Exception {
-            doNothing().when(userManagementService).banUser(eq("u-20"), isNull());
-
+        @DisplayName("blank reason rejected by @NotBlank with 422 Unprocessable Content")
+        void banUser_withBlankReason_shouldReturn422UnprocessableContent() throws Exception {
             mockMvc.perform(post("/api/v1/admin/users/u-20/ban")
                             .with(admin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.code").value(200));
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.code").value(422))
+                    .andExpect(jsonPath("$.errors.reason").exists());
 
-            verify(userManagementService).banUser(eq("u-20"), isNull());
-
-            ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
-            verify(userManagementService).banUser(eq("u-20"), reasonCaptor.capture());
-            assertThat(reasonCaptor.getValue()).isNull();
+            verifyNoInteractions(userManagementService);
         }
 
         /**
@@ -613,23 +608,24 @@ class UserManagementControllerTest {
         }
 
         /**
-         * Verifies that when non-positive minutes are supplied, the service throws BadRequestException
-         * which maps to 400 Bad Request.
+         * Verifies that non-positive minutes are rejected by Bean Validation ({@code @Positive}) with
+         * 422 Unprocessable Content. The service is never called because the constraint fires first.
+         * The service-layer {@code BadRequestException} path for minutes &lt;= 0 is proven separately
+         * in {@code UserManagementServiceTest}.
          */
         @Test
-        @DisplayName("non-positive minutes triggers BadRequestException mapping to 400 Bad Request")
-        void timeoutUser_whenNonPositiveMinutes_shouldReturn400BadRequest() throws Exception {
-            doThrow(new BadRequestException("Timeout duration must be greater than 0 minutes"))
-                    .when(userManagementService).timeoutUser(eq("u-30"), eq(0), any());
-
+        @DisplayName("non-positive minutes rejected by @Positive with 422 Unprocessable Content")
+        void timeoutUser_whenNonPositiveMinutes_shouldReturn422UnprocessableContent() throws Exception {
             mockMvc.perform(post("/api/v1/admin/users/u-30/timeout")
                             .with(admin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"minutes\":0,\"reason\":\"Invalid duration\"}"))
-                    .andExpect(status().isBadRequest())
+                    .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.code").value(400))
-                    .andExpect(jsonPath("$.message").value("Timeout duration must be greater than 0 minutes"));
+                    .andExpect(jsonPath("$.code").value(422))
+                    .andExpect(jsonPath("$.errors.minutes").exists());
+
+            verifyNoInteractions(userManagementService);
         }
 
         /**

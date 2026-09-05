@@ -13,14 +13,14 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ServletResponseUtil {
 
-    private final JsonMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     public void writeResponse(HttpServletResponse response, int status, ApiResponse<?> apiResponse) throws IOException {
         apiResponse.setCode(status);
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(apiResponse));
+        response.getWriter().write(jsonMapper.writeValueAsString(apiResponse));
         response.getWriter().flush();
     }
 }

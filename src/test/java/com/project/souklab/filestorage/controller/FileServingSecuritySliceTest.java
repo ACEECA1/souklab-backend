@@ -75,8 +75,8 @@ class FileServingSecuritySliceTest {
         }
 
         @Bean
-        public RateLimitFilter rateLimitFilter(ServletResponseUtil servletResponseUtil) {
-            return new RateLimitFilter(servletResponseUtil);
+        public RateLimitFilter rateLimitFilter(ServletResponseUtil servletResponseUtil, AppProperties appProperties) {
+            return new RateLimitFilter(servletResponseUtil, appProperties);
         }
 
         @Bean

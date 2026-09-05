@@ -135,7 +135,7 @@ class AuthServiceTest {
     private AuditLogService auditLogService;
 
     @Mock
-    private JsonMapper objectMapper;
+    private JsonMapper jsonMapper;
 
     @Mock
     private Validator validator;
@@ -182,7 +182,7 @@ class AuthServiceTest {
                 verificationTokenService,
                 emailUtil,
                 auditLogService,
-                objectMapper,
+                jsonMapper,
                 validator,
                 fixedClock
         );
@@ -1640,7 +1640,7 @@ class AuthServiceTest {
         payload.put("bio", "Test bio");
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class))
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class))
                 .thenThrow(new IllegalArgumentException("Invalid property"));
 
         assertThatThrownBy(() -> authService.patchCurrentUser(payload))
@@ -1674,7 +1674,7 @@ class AuthServiceTest {
         ConstraintViolation<ArtisanPatchDTO> violation = mock(ConstraintViolation.class);
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Set.of(violation));
 
         assertThatThrownBy(() -> authService.patchCurrentUser(payload))
@@ -1718,7 +1718,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(artisanRepository.findById("artisan-id-patch")).thenReturn(Optional.of(existingArtisan));
 
@@ -1772,7 +1772,7 @@ class AuthServiceTest {
         ArtisanPatchDTO patchDTO = new ArtisanPatchDTO();
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(artisanRepository.findById("artisan-id-patch-null")).thenReturn(Optional.of(existingArtisan));
 
@@ -1814,7 +1814,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(artisanRepository.findById("artisan-id-region-fallback")).thenReturn(Optional.of(existingArtisan));
 
@@ -1848,7 +1848,7 @@ class AuthServiceTest {
         ArtisanPatchDTO patchDTO = new ArtisanPatchDTO();
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(artisanRepository.findById("artisan-id-region-null")).thenReturn(Optional.of(existingArtisan));
 
@@ -1877,7 +1877,7 @@ class AuthServiceTest {
         payload.put("bio", "Client bio");
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class))
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class))
                 .thenThrow(new IllegalArgumentException("Invalid client property"));
 
         assertThatThrownBy(() -> authService.patchCurrentUser(payload))
@@ -1910,7 +1910,7 @@ class AuthServiceTest {
         ConstraintViolation<ClientPatchDTO> violation = mock(ConstraintViolation.class);
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Set.of(violation));
 
         assertThatThrownBy(() -> authService.patchCurrentUser(payload))
@@ -1954,7 +1954,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(clientRepository.findById("client-id-patch")).thenReturn(Optional.of(existingClient));
 
@@ -2008,7 +2008,7 @@ class AuthServiceTest {
         ClientPatchDTO patchDTO = new ClientPatchDTO();
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(clientRepository.findById("client-id-patch-null")).thenReturn(Optional.of(existingClient));
 
@@ -2050,7 +2050,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(clientRepository.findById("client-id-region-fallback")).thenReturn(Optional.of(existingClient));
 
@@ -2084,7 +2084,7 @@ class AuthServiceTest {
         ClientPatchDTO patchDTO = new ClientPatchDTO();
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(clientRepository.findById("client-id-region-null")).thenReturn(Optional.of(existingClient));
 
@@ -3370,7 +3370,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("artisan@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ArtisanPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(artisanRepository.findById("artisan-no-reg-patch")).thenReturn(Optional.of(existingArtisan));
 
@@ -3412,7 +3412,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(user));
-        when(objectMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
+        when(jsonMapper.treeToValue(payload, ClientPatchDTO.class)).thenReturn(patchDTO);
         when(validator.validate(patchDTO)).thenReturn(Collections.emptySet());
         when(clientRepository.findById("client-no-reg-patch")).thenReturn(Optional.of(existingClient));
 

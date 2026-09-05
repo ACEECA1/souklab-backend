@@ -66,7 +66,7 @@ public class AuthService {
     private final VerificationTokenService verificationTokenService;
     private final EmailUtil emailUtil;
     private final AuditLogService auditLogService;
-    private final JsonMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final Validator validator;
     private final Clock clock;
 
@@ -326,7 +326,7 @@ public class AuthService {
         if (isArtisan) {
             ArtisanPatchDTO patchDTO;
             try {
-                patchDTO = objectMapper.treeToValue(payload, ArtisanPatchDTO.class);
+                patchDTO = jsonMapper.treeToValue(payload, ArtisanPatchDTO.class);
             } catch (Exception e) {
                 throw new BadRequestException("Invalid JSON payload for artisan profile update: " + e.getMessage());
             }
@@ -365,7 +365,7 @@ public class AuthService {
         } else {
             ClientPatchDTO patchDTO;
             try {
-                patchDTO = objectMapper.treeToValue(payload, ClientPatchDTO.class);
+                patchDTO = jsonMapper.treeToValue(payload, ClientPatchDTO.class);
             } catch (Exception e) {
                 throw new BadRequestException("Invalid JSON payload for client profile update: " + e.getMessage());
             }

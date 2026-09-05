@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,6 +22,7 @@ public class AppProperties {
     private Chargily chargily = new Chargily();
     private OAuth oauth = new OAuth();
     private Relay relay = new Relay();
+    private RateLimit rateLimit = new RateLimit();
 
     @Data
     public static class Relay {
@@ -88,5 +90,17 @@ public class AppProperties {
             private String clientSecret;
             private String redirectUri;
         }
+    }
+
+    /**
+     * Global API rate-limiting configuration bound to {@code app.rate-limit.*}.
+     * Defaults are supplied via environment variables in {@code application.properties};
+     * no Java-side defaults are declared here.
+     */
+    @Data
+    public static class RateLimit {
+        private boolean enabled;
+        private int capacity;
+        private Duration refillDuration;
     }
 }
