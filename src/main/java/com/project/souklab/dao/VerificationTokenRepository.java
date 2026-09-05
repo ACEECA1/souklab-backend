@@ -13,7 +13,7 @@ import java.util.Optional;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, String> {
 
-    @Query("SELECT v FROM VerificationToken v WHERE v.user = :user AND v.type = :type AND v.usedAt IS NULL AND v.expiresAt > :now ORDER BY v.createdAt DESC")
+    @Query("SELECT v FROM VerificationToken v WHERE v.user = :user AND v.type = :type AND v.usedAt IS NULL AND v.expiresAt > :now ORDER BY v.createdAt DESC LIMIT 1")
     Optional<VerificationToken> findActiveToken(
             @Param("user") User user,
             @Param("type") VerificationTokenType type,
