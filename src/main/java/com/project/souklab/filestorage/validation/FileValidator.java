@@ -104,6 +104,25 @@ public class FileValidator {
      * @throws InvalidFilenameException if filename contains path traversal or dangerous characters
      */
     public ValidatedFile validateAndSanitize(InputStream content, String originalFilename, String declaredContentType, long declaredSize) {
+        return validateAndSanitize(content, originalFilename, declaredContentType, declaredSize, properties.getValidation().getAllowedMimeTypes());
+    }
+
+    /**
+     * Validates and sanitizes an InputStream file upload against a caller-specified list of allowed MIME types.
+     * Enables domain services with tighter format restrictions (such as avatars restricting strictly to images)
+     * to enforce narrowed constraints without bypassing stream size capping, magic-byte sniffing, or spoof detection.
+     *
+     * @param content raw input stream
+     * @param originalFilename original filename hint
+     * @param declaredContentType declared Content-Type header
+     * @param declaredSize declared payload size in bytes
+     * @param customAllowedMimeTypes custom list of permitted MIME types for this upload context
+     * @return ValidatedFile containing the wrapped stream and sanitized metadata
+     * @throws FileTooLargeException if declared size exceeds configured limit
+     * @throws UnsupportedFileTypeException if MIME type is disallowed or spoofed
+     * @throws InvalidFilenameException if filename contains path traversal or dangerous characters
+     */
+    public ValidatedFile validateAndSanitize(InputStream content, String originalFilename, String declaredContentType, long declaredSize, List<String> customAllowedMimeTypes) {
         if (content == null) {
             throw new UnsupportedFileTypeException("Uploaded file stream cannot be null");
         }
@@ -135,7 +154,10 @@ public class FileValidator {
             throw new UnsupportedFileTypeException("Could not determine file type from content signature", e);
         }
 
-        List<String> allowedTypes = properties.getValidation().getAllowedMimeTypes();
+        List<String> allowedTypes = (customAllowedMimeTypes != null && !customAllowedMimeTypes.isEmpty())
+                ? customAllowedMimeTypes
+                : properties.getValidation().getAllowedMimeTypes();
+
         if (allowedTypes == null || allowedTypes.isEmpty()) {
             throw new IllegalStateException("storage.validation.allowed-mime-types is required and cannot be empty");
         }

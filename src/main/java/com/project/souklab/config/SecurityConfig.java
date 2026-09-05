@@ -1,6 +1,8 @@
 package com.project.souklab.config;
 
 import com.project.souklab.dto.common.ApiResponse;
+import com.project.souklab.filestorage.config.StorageProperties;
+import com.project.souklab.filestorage.security.AvatarUploadSizeFilter;
 import com.project.souklab.filestorage.security.FileRateLimitFilter;
 import com.project.souklab.security.JwtAuthenticationFilter;
 import com.project.souklab.security.OAuth2AuthenticationSuccessHandler;
@@ -33,11 +35,17 @@ import java.util.List;
 public class SecurityConfig {
 
     private final AppProperties appProperties;
+    private final StorageProperties storageProperties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final FileRateLimitFilter fileRateLimitFilter;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final ServletResponseUtil servletResponseUtil;
+
+    @Bean
+    public AvatarUploadSizeFilter avatarUploadSizeFilter() {
+        return new AvatarUploadSizeFilter(storageProperties, servletResponseUtil);
+    }
 
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration() {
@@ -56,6 +64,13 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<FileRateLimitFilter> fileRateLimitFilterRegistration() {
         FilterRegistrationBean<FileRateLimitFilter> registration = new FilterRegistrationBean<>(fileRateLimitFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AvatarUploadSizeFilter> avatarUploadSizeFilterRegistration(AvatarUploadSizeFilter filter) {
+        FilterRegistrationBean<AvatarUploadSizeFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
@@ -115,6 +130,7 @@ public class SecurityConfig {
         http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(fileRateLimitFilter, JwtAuthenticationFilter.class);
+        http.addFilterAfter(avatarUploadSizeFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
     }
