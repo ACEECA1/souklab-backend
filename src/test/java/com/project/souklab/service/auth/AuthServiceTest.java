@@ -598,8 +598,8 @@ class AuthServiceTest {
      * Verifies login throws BadRequestException when account lockout timestamp is in the future.
      */
     @Test
-    @DisplayName("login: throws BadRequestException when account is temporarily locked")
-    void login_whenAccountTemporarilyLocked_throwsBadRequestException() {
+    @DisplayName("login: throws ForbiddenException when account is temporarily locked")
+    void login_whenAccountTemporarilyLocked_throwsForbiddenException() {
         LoginDTO dto = LoginDTO.builder()
                 .email("locked@example.com")
                 .password("password123")
@@ -614,7 +614,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.login(dto, null))
-                .isInstanceOf(BadRequestException.class)
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessage("Too many failed login attempts. Account is temporarily locked. Please try again later.");
     }
 
@@ -3013,36 +3013,8 @@ class AuthServiceTest {
         when(passwordEncoder.matches("wrongCurrentPassword", "hashedCurrentPassword")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.changePassword(request))
-                .isInstanceOf(BadRequestException.class)
+                .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Current password is incorrect.");
-    }
-
-    /**
-     * Verifies changePassword throws BadRequestException when new password equals current password.
-     */
-    @Test
-    @DisplayName("changePassword: throws BadRequestException when new password equals old password")
-    void changePassword_whenNewPasswordEqualsOldPassword_throwsBadRequestException() {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken("user@example.com", "cred", List.of())
-        );
-
-        ChangePasswordRequestDTO request = ChangePasswordRequestDTO.builder()
-                .oldPassword("samePassword123")
-                .newPassword("samePassword123")
-                .build();
-
-        User user = User.builder()
-                .email("user@example.com")
-                .password("hashedCurrentPassword")
-                .build();
-
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("samePassword123", "hashedCurrentPassword")).thenReturn(true);
-
-        assertThatThrownBy(() -> authService.changePassword(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("New password must be different from your current password.");
     }
 
     /**

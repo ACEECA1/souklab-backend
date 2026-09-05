@@ -1,5 +1,6 @@
 package com.project.souklab.dto.auth;
 
+import com.project.souklab.validation.DifferentPasswords;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -11,6 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@DifferentPasswords
 public class ChangePasswordRequestDTO {
 
     @NotBlank(message = "Current password is required")

@@ -787,12 +787,12 @@ class AuthControllerTest {
         }
 
         /**
-         * Verifies that incorrect current password maps to 400 Bad Request.
+         * Verifies that incorrect current password maps to 401 Unauthorized.
          */
         @Test
-        @DisplayName("wrong current password returns 400 Bad Request")
-        void changePassword_whenOldPasswordWrong_shouldReturn400BadRequest() throws Exception {
-            doThrow(new BadRequestException("Current password does not match."))
+        @DisplayName("wrong current password returns 401 Unauthorized")
+        void changePassword_whenOldPasswordWrong_shouldReturn401Unauthorized() throws Exception {
+            doThrow(new UnauthorizedException("Current password is incorrect."))
                     .when(authService).changePassword(any(ChangePasswordRequestDTO.class));
 
             mockMvc.perform(post("/api/v1/auth/change-password")
@@ -804,10 +804,32 @@ class AuthControllerTest {
                                       "newPassword": "BrandNewPassword123!"
                                     }
                                     """))
-                    .andExpect(status().isBadRequest())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.code").value(400))
-                    .andExpect(jsonPath("$.message").value("Current password does not match."));
+                    .andExpect(jsonPath("$.code").value(401))
+                    .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
+                    .andExpect(jsonPath("$.message").value("Current password is incorrect."));
+        }
+
+        /**
+         * Verifies that identical new and old passwords fail class-level validation with 422 Unprocessable Entity.
+         */
+        @Test
+        @DisplayName("identical new and old passwords return 422 Unprocessable Entity")
+        void changePassword_whenNewPasswordEqualsOldPassword_shouldReturn422Validation() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/change-password")
+                            .with(client())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "oldPassword": "SamePassword123!",
+                                      "newPassword": "SamePassword123!"
+                                    }
+                                    """))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.code").value(422))
+                    .andExpect(jsonPath("$.errors.newPassword").value("New password must be different from your current password."));
         }
     }
 

@@ -122,7 +122,6 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Email verification code generation & dispatch
         try {
             String rawCode = verificationTokenService.issueToken(savedUser, VerificationTokenType.EMAIL_VERIFICATION);
             emailUtil.sendVerificationCode(savedUser.getEmail(), rawCode);
@@ -145,7 +144,7 @@ public class AuthService {
      * Authenticates a user by email and password, issuing access + refresh token pair.
      * Enforces a 15-minute temporary lockout after 5 consecutive failed login attempts.
      */
-    @Transactional(noRollbackFor = {UnauthorizedException.class, BadRequestException.class})
+    @Transactional(noRollbackFor = {UnauthorizedException.class, BadRequestException.class, ForbiddenException.class})
     public JwtResponseDTO login(LoginDTO dto, HttpServletRequest request) {
         String identifier = dto.getLoginIdentifier();
         if (identifier == null || identifier.isBlank()) {
@@ -161,7 +160,7 @@ public class AuthService {
         }
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now(clock))) {
-            throw new BadRequestException("Too many failed login attempts. Account is temporarily locked. Please try again later.");
+            throw new ForbiddenException("Too many failed login attempts. Account is temporarily locked. Please try again later.");
         }
 
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
@@ -275,7 +274,6 @@ public class AuthService {
             if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
             if (dto.getWebsite() != null) profile.setWebsite(dto.getWebsite());
             if (dto.getSubCategoryId() != null) profile.setSubCategoryId(dto.getSubCategoryId());
-            // NOTE: isTeacher is NOT settable here — controlled exclusively by ArtisanFormateurService.
 
             artisanRepository.save(profile);
             user.setArtisan(profile);
@@ -569,7 +567,6 @@ public class AuthService {
                     .build();
         }
 
-        // Default: client path
         Client client = user.getClient();
         return ClientProfileResponseDTO.builder()
                 .id(user.getId())
@@ -735,11 +732,7 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new BadRequestException("Current password is incorrect.");
-        }
-
-        if (request.getNewPassword().equals(request.getOldPassword())) {
-            throw new BadRequestException("New password must be different from your current password.");
+            throw new UnauthorizedException("Current password is incorrect.");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
