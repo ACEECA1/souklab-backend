@@ -7,7 +7,7 @@
   },
   "item": [
     {
-      "name": "Auth — Client",
+      "name": "Auth \u2014 Client",
       "description": "Full lifecycle for CLIENT account: Registration, Email Verification, Login, Me inspection, Token Refresh, Password Mutation, and Logout.",
       "item": [
         {
@@ -449,7 +449,7 @@
       ]
     },
     {
-      "name": "Auth — Artisan",
+      "name": "Auth \u2014 Artisan",
       "description": "Full onboarding lifecycle for ARTISAN account: Registration, Verification, Login, Complete Profile with craft specialties, and Token Refresh.",
       "item": [
         {
@@ -788,7 +788,7 @@
       ]
     },
     {
-      "name": "Auth — Admin",
+      "name": "Auth \u2014 Admin",
       "description": "Administrator authentication using config-driven seed credentials (seeded via DataSeeder and bound to APP_ADMIN_DEFAULT_EMAIL / APP_ADMIN_DEFAULT_PASSWORD), followed by initial artisan account validation.",
       "item": [
         {
@@ -901,11 +901,11 @@
       ]
     },
     {
-      "name": "Artisan — Profile View",
+      "name": "Artisan \u2014 Profile View",
       "description": "Public and authenticated profile inspection for Artisans, with premium-gated contact privacy.",
       "item": [
         {
-          "name": "Get Artisan Profile — Non-Premium Client View (Locked)",
+          "name": "Get Artisan Profile \u2014 Non-Premium Client View (Locked)",
           "event": [
             {
               "listen": "test",
@@ -957,7 +957,7 @@
           "response": []
         },
         {
-          "name": "Get Artisan Profile — Self / Unlocked View",
+          "name": "Get Artisan Profile \u2014 Self / Unlocked View",
           "event": [
             {
               "listen": "test",
@@ -1011,7 +1011,7 @@
       ]
     },
     {
-      "name": "Auth — Password Reset & Misc",
+      "name": "Auth \u2014 Password Reset & Misc",
       "description": "Public recovery endpoints: Forgot Password initiation, Password Reset with code, and Resend Verification OTP.",
       "item": [
         {
@@ -1406,7 +1406,7 @@
       ]
     },
     {
-      "name": "Formateur — Artisan Actions",
+      "name": "Formateur \u2014 Artisan Actions",
       "description": "Artisan self-submission of Formateur status request and duplicate prevention assertions.",
       "item": [
         {
@@ -1528,7 +1528,7 @@
       ]
     },
     {
-      "name": "Formateur — Admin Actions",
+      "name": "Formateur \u2014 Admin Actions",
       "description": "Admin review, approval, cooldown rejection & waiver, direct granting, revocation, and permanent blocking workflows using independent test artisans.",
       "item": [
         {
@@ -2841,7 +2841,7 @@
       ]
     },
     {
-      "name": "Admin — User Moderation",
+      "name": "Admin \u2014 User Moderation",
       "description": "Administrative operations for listing, filtering, bulk approving, timing out, and banning platform users.",
       "item": [
         {
@@ -3325,27 +3325,227 @@
       ]
     },
     {
-      "name": "File Storage",
-      "description": "Endpoints for retrieving stored files and media with dedicated rate limiting and immutable caching.",
+      "name": "User \u2014 Avatar Management",
+      "description": "Comprehensive avatar lifecycle management endpoints for authenticated users including multipart upload, tier URL generation, quota capping, gallery listing, active switching, and safe deletion.",
       "item": [
         {
-          "name": "Get File (Serve by Key)",
+          "name": "Setup \u2014 Authenticate Avatar User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Avatar user authenticated successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "});",
+                  "pm.environment.set(\"avatarAccessToken\", json.data.accessToken);"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{clientAccessToken}}",
-                  "type": "string"
-                }
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
               ]
             },
+            "description": "Authenticates the test user and sets avatarAccessToken for all subsequent avatar operations.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Setup \u2014 Clean Existing Avatars (Idempotency Guard)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.content && json.data.content.length > 0) {",
+                  "    json.data.content.forEach(function (avatar) {",
+                  "        pm.sendRequest({",
+                  "            url: pm.environment.get(\"baseUrl\") + \"/users/me/avatars/\" + avatar.id,",
+                  "            method: \"DELETE\",",
+                  "            header: {",
+                  "                \"Authorization\": \"Bearer \" + pm.environment.get(\"avatarAccessToken\")",
+                  "            }",
+                  "        }, function (err, res) {});",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
             "method": "GET",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{clientAccessToken}}",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Deletes any pre-existing avatars belonging to the test user to guarantee clean-slate execution."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar 1 \u2014 PNG (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Avatar upload response envelope and message\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.message).to.eql(\"Avatar uploaded successfully\");",
+                  "});",
+                  "pm.test(\"Avatar response DTO contains required fields and valid formats\", function () {",
+                  "    pm.expect(json.data.id).to.be.a(\"string\");",
+                  "    pm.expect(json.data.urlOriginal).to.match(/^\\/api\\/v1\\/files\\/.+/);",
+                  "    pm.expect(json.data.urlMedium).to.match(/^\\/api\\/v1\\/files\\/.+/);",
+                  "    pm.expect(json.data.urlThumbnail).to.match(/^\\/api\\/v1\\/files\\/.+/);",
+                  "    pm.expect(json.data.originalFilename).to.eql(\"sample-avatar.png\");",
+                  "    pm.expect(json.data.contentType).to.eql(\"image/png\");",
+                  "    pm.expect(json.data.fileSize).to.be.above(0);",
+                  "    pm.expect(json.data.isActive).to.be.true;",
+                  "});",
+                  "pm.environment.set(\"previousAvatarId\", json.data.id);",
+                  "const origKey = json.data.urlOriginal.replace(\"/api/v1/files/\", \"\");",
+                  "const medKey = json.data.urlMedium.replace(\"/api/v1/files/\", \"\");",
+                  "const thumbKey = json.data.urlThumbnail.replace(\"/api/v1/files/\", \"\");",
+                  "pm.environment.set(\"avatarOriginalKey\", origKey);",
+                  "pm.environment.set(\"avatarMediumKey\", medKey);",
+                  "pm.environment.set(\"avatarThumbnailKey\", thumbKey);",
+                  "pm.environment.set(\"avatarStorageKey\", thumbKey);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a valid PNG image. Asserts 201, verifies complete DTO shape, and captures previousAvatarId and tier keys.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.png"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Avatar 1 Original URL Resolves",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", pm.environment.get(\"avatarOriginalKey\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for original tier stream\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response Content-Type is image/png\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"image/png\");",
+                  "});",
+                  "pm.test(\"Content-Length is greater than 0\", function () {",
+                  "    pm.expect(Number(pm.response.headers.get(\"Content-Length\"))).to.be.above(0);",
+                  "});",
+                  "pm.test(\"Content-Disposition is inline\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"inline\");",
+                  "});",
+                  "pm.test(\"Cache-Control is private immutable\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"private, max-age=31536000, immutable\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
                 "type": "text"
               }
             ],
@@ -3361,185 +3561,1646 @@
               "variable": [
                 {
                   "key": "key",
-                  "value": "sample-uuid.jpg",
-                  "description": "Unique storage identifier / key of the stored file (placeholder until upload orchestration in Phase D)"
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
                 }
               ]
             },
-            "description": "Streams a stored file by its unique storage key. Requires authentication (authenticated-only baseline). Sets Content-Type, Content-Length, inline Content-Disposition with RFC 5987 fallback, and private immutable Cache-Control headers."
+            "description": "Fetches the original resolution image stream via /api/v1/files/:key and asserts 200, Content-Type, Content-Length, and Cache-Control headers."
           },
-          "response": [
+          "response": []
+        },
+        {
+          "name": "Verify Avatar 1 Medium URL Resolves",
+          "event": [
             {
-              "name": "200 OK (File Stream)",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{clientAccessToken}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/files/:key",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "files",
-                    ":key"
-                  ],
-                  "variable": [
-                    {
-                      "key": "key",
-                      "value": "sample-uuid.jpg",
-                      "description": "Unique storage identifier / key of the stored file"
-                    }
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "binary",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "image/jpeg"
-                },
-                {
-                  "key": "Content-Length",
-                  "value": "1048576"
-                },
-                {
-                  "key": "Content-Disposition",
-                  "value": "inline; filename=\"avatar_original.jpg\"; filename*=UTF-8''avatar_original.jpg"
-                },
-                {
-                  "key": "Cache-Control",
-                  "value": "private, max-age=31536000, immutable"
-                }
-              ],
-              "cookie": [],
-              "body": "<binary file stream content>"
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", pm.environment.get(\"avatarMediumKey\"));"
+                ]
+              }
             },
             {
-              "name": "401 Unauthorized",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/files/:key",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "files",
-                    ":key"
-                  ],
-                  "variable": [
-                    {
-                      "key": "key",
-                      "value": "sample-uuid.jpg",
-                      "description": "Unique storage identifier / key of the stored file"
-                    }
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"success\": false,\n  \"code\": 401,\n  \"message\": \"Full authentication is required to access this resource\",\n  \"data\": null\n}"
-            },
-            {
-              "name": "404 Not Found (FILE_NOT_FOUND)",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{clientAccessToken}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/files/:key",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "files",
-                    ":key"
-                  ],
-                  "variable": [
-                    {
-                      "key": "key",
-                      "value": "nonexistent-key.jpg",
-                      "description": "Non-existent storage key"
-                    }
-                  ]
-                }
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"success\": false,\n  \"code\": 404,\n  \"errorCode\": \"FILE_NOT_FOUND\",\n  \"message\": \"File not found for key: nonexistent-key.jpg\",\n  \"data\": null\n}"
-            },
-            {
-              "name": "429 Too Many Requests",
-              "originalRequest": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{clientAccessToken}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/files/:key",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "files",
-                    ":key"
-                  ],
-                  "variable": [
-                    {
-                      "key": "key",
-                      "value": "sample-uuid.jpg",
-                      "description": "Unique storage identifier / key of the stored file"
-                    }
-                  ]
-                }
-              },
-              "status": "Too Many Requests",
-              "code": 429,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"success\": false,\n  \"code\": 429,\n  \"message\": \"Too many requests. Please try again later.\",\n  \"data\": null\n}"
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for medium tier stream\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response Content-Type is image/png\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"image/png\");",
+                  "});",
+                  "pm.test(\"Content-Length is greater than 0\", function () {",
+                  "    pm.expect(Number(pm.response.headers.get(\"Content-Length\"))).to.be.above(0);",
+                  "});"
+                ]
+              }
             }
-          ]
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
+                }
+              ]
+            },
+            "description": "Fetches the medium resolution image stream and asserts HTTP 200 and image Content-Type."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Avatar 1 Thumbnail URL Resolves",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", pm.environment.get(\"avatarThumbnailKey\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for thumbnail tier stream\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response Content-Type is image/png\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"image/png\");",
+                  "});",
+                  "pm.test(\"Content-Length is greater than 0\", function () {",
+                  "    pm.expect(Number(pm.response.headers.get(\"Content-Length\"))).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
+                }
+              ]
+            },
+            "description": "Fetches the thumbnail resolution image stream and asserts HTTP 200 and image Content-Type."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Active Avatar in Profile (GET /auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Profile avatarUrl matches newly uploaded Avatar 1 thumbnail\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    const expectedUrl = \"/api/v1/files/\" + pm.environment.get(\"avatarThumbnailKey\");",
+                  "    pm.expect(json.data.avatarUrl).to.eql(expectedUrl);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Verifies that GET /api/v1/auth/me reflects the thumbnail URL of the newly activated avatar."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar 2 \u2014 JPEG",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Avatar 2 uploaded with JPEG content type\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.originalFilename).to.eql(\"sample-avatar.jpg\");",
+                  "    pm.expect(json.data.contentType).to.eql(\"image/jpeg\");",
+                  "    pm.expect(json.data.isActive).to.be.true;",
+                  "});",
+                  "pm.environment.set(\"uploadedAvatarId\", json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a second avatar (JPEG format). Asserts 201 and captures uploadedAvatarId.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.jpg"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Avatar Gallery (Paginated & Ordered DESC)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Gallery conforms to PaginatedResponse shape\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content).to.be.an(\"array\");",
+                  "    pm.expect(json.data.pageNumber).to.eql(0);",
+                  "    pm.expect(json.data.pageSize).to.eql(20);",
+                  "    pm.expect(json.data.totalElements).to.eql(2);",
+                  "    pm.expect(json.data.totalPages).to.eql(1);",
+                  "});",
+                  "pm.test(\"Gallery is ordered uploadedAt DESC with latest avatar active\", function () {",
+                  "    pm.expect(json.data.content[0].id).to.eql(pm.environment.get(\"uploadedAvatarId\"));",
+                  "    pm.expect(json.data.content[0].isActive).to.be.true;",
+                  "    pm.expect(json.data.content[1].id).to.eql(pm.environment.get(\"previousAvatarId\"));",
+                  "    pm.expect(json.data.content[1].isActive).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars?page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Retrieves the avatar gallery. Asserts PaginatedResponse shape, DESC ordering by uploadedAt, and that only Avatar 2 is active."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Previous Avatar (PUT /activate)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", pm.environment.get(\"previousAvatarId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Previous avatar activated successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.id).to.eql(pm.environment.get(\"previousAvatarId\"));",
+                  "    pm.expect(json.data.isActive).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id",
+                "activate"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Activates Avatar 1. Asserts 200 and isActive is true."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Re-Activated Avatar in Profile (GET /auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Profile avatarUrl points back to Avatar 1 thumbnail\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    const expectedUrl = \"/api/v1/files/\" + pm.environment.get(\"avatarThumbnailKey\");",
+                  "    pm.expect(json.data.avatarUrl).to.eql(expectedUrl);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Verifies that profile avatarUrl now reflects the re-activated Avatar 1 thumbnail."
+          },
+          "response": []
+        },
+        {
+          "name": "Re-Activate Already-Active Avatar (Idempotent No-Op)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", pm.environment.get(\"previousAvatarId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Already-active avatar activation is an idempotent 200 no-op\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.id).to.eql(pm.environment.get(\"previousAvatarId\"));",
+                  "    pm.expect(json.data.isActive).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id",
+                "activate"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Calls activate on the already-active avatar. Asserts 200 OK and idempotent response."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Non-Active Avatar (DELETE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", pm.environment.get(\"uploadedAvatarId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Non-active avatar deleted with confirmation and null data\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.be.null;",
+                  "    pm.expect(json.message).to.eql(\"Avatar deleted successfully\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Deletes non-active Avatar 2. Asserts 200 OK and null data payload."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Active Avatar Unchanged (GET /auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Profile avatarUrl remains unchanged after non-active avatar deletion\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    const expectedUrl = \"/api/v1/files/\" + pm.environment.get(\"avatarThumbnailKey\");",
+                  "    pm.expect(json.data.avatarUrl).to.eql(expectedUrl);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Verifies that deleting a non-active avatar does NOT modify the active avatarUrl in the user profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Currently Active Avatar (DELETE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", pm.environment.get(\"previousAvatarId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Active avatar deleted successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Deletes the currently active avatar (Avatar 1). Asserts 200 OK."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Active Avatar Cleared to Null (GET /auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Profile avatarUrl is cleared to null after active avatar deletion\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.avatarUrl).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Verifies that deleting the active avatar clears user avatarUrl to null."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify No Auto-Promotion in Gallery (GET /avatars)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"No remaining avatars are active (no automatic promotion)\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    if (json.data && json.data.content) {",
+                  "        json.data.content.forEach(function (avatar) {",
+                  "            pm.expect(avatar.isActive).to.be.false;",
+                  "        });",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Verifies that deleting the active avatar does not automatically promote any other avatar to active."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Non-Existent Avatar (DELETE 404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", \"00000000-0000-0000-0000-000000000000\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error code is RESOURCE_NOT_FOUND\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.errorCode).to.eql(\"RESOURCE_NOT_FOUND\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Attempts to delete a non-existent avatar ID. Asserts 404 and RESOURCE_NOT_FOUND error code."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar \u2014 Invalid MIME Type (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error code is UNSUPPORTED_FILE_TYPE\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.errorCode).to.eql(\"UNSUPPORTED_FILE_TYPE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a plain text file. Asserts 400 Bad Request and UNSUPPORTED_FILE_TYPE error code.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/invalid-mime.txt"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar \u2014 Disguised Text File (400 Spoofed MIME)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Magic-byte inspection catches spoofed content type\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.errorCode).to.eql(\"UNSUPPORTED_FILE_TYPE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a text file disguised with a .jpg extension. Asserts 400 Bad Request via Tika content inspection.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/disguised-text.jpg"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar \u2014 Oversized File (413 FILE_TOO_LARGE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 413 Payload Too Large\", function () {",
+                  "    pm.response.to.have.status(413);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error code is FILE_TOO_LARGE intercepted by size filter\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.errorCode).to.eql(\"FILE_TOO_LARGE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a 12MB file exceeding the 10MB limit. Asserts early 413 rejection by AvatarUploadSizeFilter.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/oversized-avatar.jpg"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Quota \u2014 Upload Avatar Fill Cap (Loop to 10)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let count = Number(pm.environment.get(\"quotaUploadCount\") || 0);",
+                  "pm.environment.set(\"quotaUploadCount\", count + 1);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for quota avatar\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "let count = Number(pm.environment.get(\"quotaUploadCount\"));",
+                  "if (count < 10) {",
+                  "    pm.execution.setNextRequest(\"Quota \u2014 Upload Avatar Fill Cap (Loop to 10)\");",
+                  "} else {",
+                  "    pm.execution.setNextRequest(\"Quota \u2014 Exceed Cap 11th Upload (409)\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Loops uploading avatars until the 10-avatar quota is reached.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.png"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Quota \u2014 Exceed Cap 11th Upload (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 409 Conflict when quota cap is exceeded\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error code is AVATAR_LIMIT_EXCEEDED with explanatory message\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.errorCode).to.eql(\"AVATAR_LIMIT_EXCEEDED\");",
+                  "    pm.expect(json.message).to.include(\"Maximum avatar limit of 10 reached\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Attempts the 11th avatar upload. Asserts 409 Conflict and AVATAR_LIMIT_EXCEEDED errorCode.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.png"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teardown \u2014 Clean Quota Avatars",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.content && json.data.content.length > 0) {",
+                  "    json.data.content.forEach(function (avatar) {",
+                  "        pm.sendRequest({",
+                  "            url: pm.environment.get(\"baseUrl\") + \"/users/me/avatars/\" + avatar.id,",
+                  "            method: \"DELETE\",",
+                  "            header: {",
+                  "                \"Authorization\": \"Bearer \" + pm.environment.get(\"avatarAccessToken\")",
+                  "            }",
+                  "        }, function (err, res) {});",
+                  "    });",
+                  "}",
+                  "pm.environment.set(\"quotaUploadCount\", 0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Cleans up all avatars created during the quota test, restoring pristine database state."
+          },
+          "response": []
+        },
+        {
+          "name": "Rate Limit Setup \u2014 Register Burst User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "pm.environment.set(\"rateLimitUserEmail\", \"ratelimit.\" + ts + \"@souklab.dz\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created for burst test user\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Registers a fresh dedicated user account for rate limit exhaustion testing to guarantee zero cross-test token contamination.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rateLimitUserEmail}}\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"Rate\",\n  \"lastName\": \"Burst\",\n  \"role\": \"CLIENT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rate Limit Setup \u2014 Login Burst User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK for burst user login\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Burst user authenticated successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "});",
+                  "pm.environment.set(\"rateLimitUserToken\", json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in the dedicated burst test user and stores rateLimitUserToken.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rateLimitUserEmail}}\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rate Limit \u2014 Burst Exceeding Capacity (429)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 429) {",
+                  "    // Token consumed under fresh bucket capacity, keep bursting until bucket is exhausted",
+                  "    pm.execution.setNextRequest(\"Rate Limit \u2014 Burst Exceeding Capacity (429)\");",
+                  "} else {",
+                  "    pm.test(\"Status code is 429 Too Many Requests\", function () {",
+                  "        pm.response.to.have.status(429);",
+                  "    });",
+                  "    const json = pm.response.json();",
+                  "    pm.test(\"Standard ApiResponse 429 error envelope\", function () {",
+                  "        pm.expect(json.success).to.be.false;",
+                  "        pm.expect(json.code).to.eql(429);",
+                  "        pm.expect(json.message).to.include(\"Too many requests\");",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rateLimitUserToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Bursts upload requests with the dedicated burst user until the rate limiter token bucket is exhausted, asserting HTTP 429 and standard error envelope.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.png"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Storage",
+      "description": "Endpoints for retrieving stored files and media with dedicated rate limiting, MIME verification, and immutable caching.",
+      "item": [
+        {
+          "name": "Setup \u2014 Authenticate File Storage User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"File Storage user authenticated successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "});",
+                  "pm.environment.set(\"avatarAccessToken\", json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates the user and sets avatarAccessToken for file storage requests.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Setup \u2014 Upload File for Storage Serving",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"File uploaded and storage keys generated\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.urlOriginal).to.match(/^\\/api\\/v1\\/files\\/.+/);",
+                  "});",
+                  "const key = json.data.urlOriginal.replace(\"/api/v1/files/\", \"\");",
+                  "pm.environment.set(\"avatarStorageKey\", key);",
+                  "pm.environment.set(\"fileStorageTestAvatarId\", json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars"
+              ]
+            },
+            "description": "Uploads a sample file so File Storage tests have a known valid storage key.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ".postman/fixtures/sample-avatar.png"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get File (Serve by Valid Key)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", pm.environment.get(\"avatarStorageKey\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Content-Type matches image MIME type\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.match(/^image\\//);",
+                  "});",
+                  "pm.test(\"Content-Length is greater than 0\", function () {",
+                  "    pm.expect(Number(pm.response.headers.get(\"Content-Length\"))).to.be.above(0);",
+                  "});",
+                  "pm.test(\"Content-Disposition specifies inline display\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"inline\");",
+                  "});",
+                  "pm.test(\"Cache-Control specifies private immutable caching\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"private, max-age=31536000, immutable\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
+                }
+              ]
+            },
+            "description": "Streams a stored file by its unique storage key. Asserts 200 OK, Content-Type, Content-Length, inline Content-Disposition, and immutable Cache-Control."
+          },
+          "response": []
+        },
+        {
+          "name": "Get File \u2014 Non-Existent Key (404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", \"00000000-0000-0000-0000-nonexistent.jpg\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error response indicates file not found\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect([\"FILE_NOT_FOUND\", \"RESOURCE_NOT_FOUND\"]).to.include(json.errorCode);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
+                }
+              ]
+            },
+            "description": "Attempts to retrieve a non-existent storage key. Asserts 404 Not Found and FILE_NOT_FOUND error code."
+          },
+          "response": []
+        },
+        {
+          "name": "Get File \u2014 Unauthenticated Request (401)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"key\", pm.environment.get(\"avatarStorageKey\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Error code is 401 for unauthenticated request\", function () {",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.code).to.eql(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":key"
+              ],
+              "variable": [
+                {
+                  "key": "key",
+                  "value": "{{key}}",
+                  "description": "URL path variable key"
+                }
+              ]
+            },
+            "description": "Attempts to retrieve a file without providing authentication credentials. Asserts 401 Unauthorized."
+          },
+          "response": []
+        },
+        {
+          "name": "Teardown \u2014 Delete Storage Test File",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"id\", pm.environment.get(\"fileStorageTestAvatarId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test(\"Storage test avatar deleted successfully\", function () {",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{avatarAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatars/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "avatars",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}",
+                  "description": "URL path variable id"
+                }
+              ]
+            },
+            "description": "Deletes the test file avatar uploaded during setup, keeping database and storage clean."
+          },
+          "response": []
         }
       ]
     }
