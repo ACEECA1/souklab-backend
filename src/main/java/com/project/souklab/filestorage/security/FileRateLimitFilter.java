@@ -1,5 +1,7 @@
 package com.project.souklab.filestorage.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.filestorage.config.StorageProperties;
 import com.project.souklab.filestorage.controller.FileServingController;
@@ -19,8 +21,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Dedicated rate-limiting filter for file-serving and upload endpoints (/api/v1/files/**).
@@ -31,7 +31,7 @@ public class FileRateLimitFilter extends OncePerRequestFilter {
 
     private final ServletResponseUtil servletResponseUtil;
     private final StorageProperties.RateLimitProperties rateLimitProperties;
-    private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> cache;
 
     /**
      * Constructs a new FileRateLimitFilter with injected response utility and storage properties.
@@ -42,6 +42,11 @@ public class FileRateLimitFilter extends OncePerRequestFilter {
     public FileRateLimitFilter(ServletResponseUtil servletResponseUtil, StorageProperties properties) {
         this.servletResponseUtil = servletResponseUtil;
         this.rateLimitProperties = properties != null ? properties.getRateLimit() : new StorageProperties.RateLimitProperties();
+        StorageProperties.RateLimitProperties.CacheProperties cacheConfig = this.rateLimitProperties.getCache();
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(cacheConfig.getMaximumSize())
+                .expireAfterAccess(cacheConfig.getExpireAfterAccess())
+                .build();
     }
 
     /**
@@ -111,7 +116,7 @@ public class FileRateLimitFilter extends OncePerRequestFilter {
      * @return active Bucket instance
      */
     public Bucket resolveBucket(String key) {
-        return cache.computeIfAbsent(key, k -> createNewBucket());
+        return cache.get(key, k -> createNewBucket());
     }
 
     /**

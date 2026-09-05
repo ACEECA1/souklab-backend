@@ -54,5 +54,27 @@ public class AvatarProperties {
          * Duration over which the rate limit capacity refills (e.g. 1m).
          */
         private Duration refillDuration;
+
+        /**
+         * In-memory cache configuration for avatar upload rate limiting buckets.
+         */
+        private CacheProperties cache = new CacheProperties();
+
+        /**
+         * Cache configuration properties for in-memory rate limiting buckets.
+         */
+        @Getter
+        @Setter
+        public static class CacheProperties {
+            /**
+             * Maximum number of client buckets retained in memory.
+             */
+            private long maximumSize;
+
+            /**
+             * Inactivity duration after which an idle client bucket is evicted.
+             */
+            private Duration expireAfterAccess;
+        }
     }
 }

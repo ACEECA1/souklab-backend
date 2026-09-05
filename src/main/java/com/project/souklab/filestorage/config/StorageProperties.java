@@ -163,5 +163,27 @@ public class StorageProperties {
          * Duration over which the rate limit capacity refills (e.g. 1m).
          */
         private Duration refillDuration = Duration.ofMinutes(1);
+
+        /**
+         * In-memory cache configuration for rate limiting buckets.
+         */
+        private CacheProperties cache = new CacheProperties();
+
+        /**
+         * Cache configuration properties for in-memory rate limiting buckets.
+         */
+        @Getter
+        @Setter
+        public static class CacheProperties {
+            /**
+             * Maximum number of client buckets retained in memory.
+             */
+            private long maximumSize = 10000;
+
+            /**
+             * Inactivity duration after which an idle client bucket is evicted.
+             */
+            private Duration expireAfterAccess = Duration.ofMinutes(10);
+        }
     }
 }

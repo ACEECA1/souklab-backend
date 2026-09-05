@@ -1,5 +1,7 @@
 package com.project.souklab.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.project.souklab.config.AppProperties;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.util.ServletResponseUtil;
@@ -9,22 +11,28 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ServletResponseUtil servletResponseUtil;
     private final AppProperties appProperties;
-    private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> cache;
+
+    public RateLimitFilter(ServletResponseUtil servletResponseUtil, AppProperties appProperties) {
+        this.servletResponseUtil = servletResponseUtil;
+        this.appProperties = appProperties;
+        AppProperties.RateLimit.Cache cacheConfig = appProperties.getRateLimit().getCache();
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(cacheConfig.getMaximumSize())
+                .expireAfterAccess(cacheConfig.getExpireAfterAccess())
+                .build();
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -41,7 +49,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     public Bucket resolveBucket(String ip) {
-        return cache.computeIfAbsent(ip, k -> createNewBucket());
+        return cache.get(ip, k -> createNewBucket());
     }
 
     @Override

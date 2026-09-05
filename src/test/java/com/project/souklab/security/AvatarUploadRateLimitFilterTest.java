@@ -37,6 +37,8 @@ class AvatarUploadRateLimitFilterTest {
         avatarProperties.getRateLimit().setEnabled(true);
         avatarProperties.getRateLimit().setCapacity(2);
         avatarProperties.getRateLimit().setRefillDuration(Duration.ofMinutes(1));
+        avatarProperties.getRateLimit().getCache().setMaximumSize(1000L);
+        avatarProperties.getRateLimit().getCache().setExpireAfterAccess(Duration.ofMinutes(10));
 
         filter = new AvatarUploadRateLimitFilter(servletResponseUtil, avatarProperties);
     }

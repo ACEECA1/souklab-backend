@@ -24,6 +24,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
+
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,7 +53,13 @@ class FileServingSecuritySliceTest {
     static class TestFilterConfig {
         @Bean
         public AppProperties appProperties() {
-            return new AppProperties();
+            AppProperties appProperties = new AppProperties();
+            appProperties.getRateLimit().setEnabled(false);
+            appProperties.getRateLimit().setCapacity(100);
+            appProperties.getRateLimit().setRefillDuration(Duration.ofMinutes(1));
+            appProperties.getRateLimit().getCache().setMaximumSize(10000L);
+            appProperties.getRateLimit().getCache().setExpireAfterAccess(Duration.ofMinutes(10));
+            return appProperties;
         }
 
         @Bean

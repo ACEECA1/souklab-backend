@@ -91,6 +91,12 @@
             <version>8.10.1</version>
         </dependency>
 
+        <!-- In-Memory Cache: Caffeine (Bounded cache for rate limit filters) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Full-Text Search: Hibernate Search 8.x + Elasticsearch 8.x Backend -->
         <dependency>
             <groupId>org.hibernate.search</groupId>

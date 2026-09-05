@@ -1,5 +1,7 @@
 package com.project.souklab.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.project.souklab.config.AvatarProperties;
 import com.project.souklab.dto.common.ApiResponse;
 import com.project.souklab.util.ServletResponseUtil;
@@ -17,8 +19,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Dedicated rate-limiting filter for authenticated avatar upload requests (POST /api/v1/users/me/avatars).
@@ -29,7 +29,7 @@ public class AvatarUploadRateLimitFilter extends OncePerRequestFilter {
 
     private final ServletResponseUtil servletResponseUtil;
     private final AvatarProperties.RateLimitProperties rateLimitProperties;
-    private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> cache;
 
     /**
      * Constructs a new AvatarUploadRateLimitFilter with injected response utility and avatar properties.
@@ -40,6 +40,11 @@ public class AvatarUploadRateLimitFilter extends OncePerRequestFilter {
     public AvatarUploadRateLimitFilter(ServletResponseUtil servletResponseUtil, AvatarProperties avatarProperties) {
         this.servletResponseUtil = servletResponseUtil;
         this.rateLimitProperties = avatarProperties != null ? avatarProperties.getRateLimit() : new AvatarProperties.RateLimitProperties();
+        AvatarProperties.RateLimitProperties.CacheProperties cacheConfig = this.rateLimitProperties.getCache();
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(cacheConfig.getMaximumSize())
+                .expireAfterAccess(cacheConfig.getExpireAfterAccess())
+                .build();
     }
 
     /**
@@ -111,7 +116,7 @@ public class AvatarUploadRateLimitFilter extends OncePerRequestFilter {
      * @return active Bucket instance
      */
     public Bucket resolveBucket(String key) {
-        return cache.computeIfAbsent(key, k -> createNewBucket());
+        return cache.get(key, k -> createNewBucket());
     }
 
     /**
